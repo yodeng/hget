@@ -1,0 +1,5 @@
+Cython
+requests
+aiohttp
+tqdm
+tenacity

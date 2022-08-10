@@ -1,0 +1,7 @@
+*py[cod]
+*.c
+__pycache__/
+tmp/
+build/
+test*/
+*.egg-info/
