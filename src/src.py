@@ -7,7 +7,7 @@ from .utils import *
 
 
 class Download(object):
-    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False):
+    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, **kwargs):
         self.url = url
         self.outfile = os.path.abspath(outfile)
         self.outdir = os.path.dirname(self.outfile)
@@ -25,6 +25,7 @@ class Download(object):
         self.set_sem(self.threads)
         self.Retry = Retry
         self.quite = quite
+        self.extra = kwargs
 
     def get_range(self, content_length, size=1024 * 1000):
         if os.path.isfile(self.rang_file):
@@ -104,7 +105,7 @@ class Download(object):
                 headers["Range"] = 'bytes={0}-{1}'.format(s, e)
                 self.loger.debug(
                     "Start %s %s", asyncio.current_task().get_name(), headers["Range"])
-                async with session.get(self.url, headers=headers, timeout=self.timeout) as req:
+                async with session.get(self.url, headers=headers, timeout=self.timeout, params=self.extra) as req:
                     with open(self.outfile, 'r+b') as f:
                         f.seek(s, os.SEEK_SET)
                         async for chunk in req.content.iter_chunked(102400):
@@ -168,7 +169,7 @@ class Download(object):
 
 
 @retry(wait=wait_fixed(2), retry=retry_if_result(lambda v: not v) | retry_if_exception_type())
-def hget(url="", outfile="", threads=None, quite=False, **kwargs):
+def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, **kwargs):
     dn = Download(url=url, outfile=outfile,
                   threads=threads, quite=quite, **kwargs)
     es = exitSync(obj=dn)
