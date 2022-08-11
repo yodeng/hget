@@ -7,7 +7,7 @@ from .utils import *
 
 
 class Download(object):
-    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, **kwargs):
+    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, tcp_conn=None, **kwargs):
         self.url = url
         self.outfile = os.path.abspath(outfile)
         self.outdir = os.path.dirname(self.outfile)
@@ -15,8 +15,10 @@ class Download(object):
         mkdir(self.outdir)
         self.threads = min(max_async(), threads or Chunk.MAX_AS)
         self.parts = Chunk.MAX_PT
+        self.tcp_conn = tcp_conn
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
-        self.connector = TCPConnector(limit=None, ssl=False)
+        self.connector = TCPConnector(
+            limit=self.tcp_conn, verify_ssl=False)
         self.headers = headers
         self.headers.update(default_headers)
         self.offset = {}
@@ -79,8 +81,8 @@ class Download(object):
             if len(self.Retry) == 0:
                 self.loger.info("File size: %s (%d bytes)",
                                 human_size(content_length), content_length)
-                self.loger.info("Ranges: %s, Sem: %s, %s", self.parts,
-                                self.threads, get_as_part(content_length))
+                self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
+                                self.threads, self.tcp_conn or 100, get_as_part(content_length))
                 self.loger.info("Starting download")
                 self.Retry.append(content_length)
             else:
@@ -168,10 +170,10 @@ class Download(object):
         return log
 
 
-@retry(wait=wait_fixed(2), retry=retry_if_result(lambda v: not v) | retry_if_exception_type())
-def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, **kwargs):
+@retry(wait=wait_fixed(1), retry=retry_if_result(lambda v: not v) | retry_if_exception_type())
+def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, **kwargs):
     dn = Download(url=url, outfile=outfile,
-                  threads=threads, quite=quite, **kwargs)
+                  threads=threads, quite=quite, tcp_conn=tcp_conn, **kwargs)
     es = exitSync(obj=dn)
     es.start()
     res = dn.run()
