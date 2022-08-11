@@ -13,7 +13,7 @@ class Download(object):
         self.outdir = os.path.dirname(self.outfile)
         self.rang_file = self.outfile + ".ht"
         mkdir(self.outdir)
-        self.threads = min(max_async(), threads or Chunk.MAX_AS)
+        self.threads = threads or min(max_async(), threads or Chunk.MAX_AS)
         self.parts = Chunk.MAX_PT
         self.tcp_conn = tcp_conn
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
@@ -45,7 +45,7 @@ class Download(object):
                 self.offset[end] = [start0, start, read]
                 self.range_list.append(rang)
                 self.content_length = end
-            self.loger.debug("%s of %s has download." %
+            self.loger.debug("%s of %s has download" %
                              (self.tqdm_init, self.content_length))
         else:
             self.content_length = content_length
@@ -81,13 +81,11 @@ class Download(object):
             if len(self.Retry) == 0:
                 self.loger.info("File size: %s (%d bytes)",
                                 human_size(content_length), content_length)
-                self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
-                                self.threads, self.tcp_conn or 100, get_as_part(content_length))
-                self.loger.info("Starting download")
+                self.loger.info("Starting download %s --> %s",
+                                self.url, self.outfile)
                 self.Retry.append(content_length)
-            else:
-                self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
-                                 self.threads, get_as_part(content_length))
+            self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
+                            self.threads, self.tcp_conn or 100, get_as_part(content_length))
             with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
                 tasks = []
                 for h_range in self.range_list:
@@ -125,6 +123,9 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     def run(self):
+        if not self.url.startswith("http"):
+            self.loger.error("Only http or https urls allowed")
+            sys.exit(1)
         Done = False
         try:
             self.loop = asyncio.get_event_loop()

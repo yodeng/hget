@@ -68,11 +68,12 @@ def max_async():
         max_as = 50
     else:
         max_as = 20
-    return max_as
+    return max(max_as, 1)
 
 
 def get_as_part(filesize):
     mn_as, mn_pt = 10, 20
+    min_as, min_pt = 10, 10
     if filesize > 1 * Chunk.OneG:
         mn_pt = Chunk.MAX_PT
     elif filesize > 500 * Chunk.OneM:
@@ -84,7 +85,7 @@ def get_as_part(filesize):
     mn_pt = min(mn_pt, Chunk.MAX_PT)
     mn_as = max_async()
     mn_as = min(mn_as, mn_pt)
-    return int(mn_as), int(mn_pt)
+    return max(int(mn_as), min_as), max(int(mn_pt), min_pt)
 
 
 Retry = []
@@ -157,5 +158,5 @@ def parseArg():
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
     parser.add_argument("url", type=str,
-                        help="download url", metavar="<str>")
+                        help="download url, only support http/https", metavar="<str>")
     return parser.parse_args()
