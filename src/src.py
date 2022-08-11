@@ -6,8 +6,8 @@ import sys
 from .utils import *
 
 
-class AsyncDownload(object):
-    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}):
+class Download(object):
+    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False):
         self.url = url
         self.outfile = os.path.abspath(outfile)
         self.outdir = os.path.dirname(self.outfile)
@@ -24,6 +24,7 @@ class AsyncDownload(object):
         self.tqdm_init = 0
         self.set_sem(self.threads)
         self.Retry = Retry
+        self.quite = quite
 
     def get_range(self, content_length, size=1024 * 1000):
         if os.path.isfile(self.rang_file):
@@ -84,7 +85,7 @@ class AsyncDownload(object):
             else:
                 self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
                                  self.threads, get_as_part(content_length))
-            with tqdm(total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
+            with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
                 tasks = []
                 for h_range in self.range_list:
                     s, e = h_range["Range"]
@@ -160,17 +161,21 @@ class AsyncDownload(object):
 
     @property
     def loger(self):
-        return logging.getLogger()
+        log = logging.getLogger()
+        if self.quite:
+            log.setLevel(logging.ERROR)
+        return log
 
 
 @retry(wait=wait_fixed(2), retry=retry_if_result(lambda v: not v) | retry_if_exception_type())
-def hget(url, outfile, threads):
-    dn = AsyncDownload(url=url, outfile=outfile, threads=threads)
+def hget(url="", outfile="", threads=None, quite=False, **kwargs):
+    dn = Download(url=url, outfile=outfile,
+                  threads=threads, quite=quite, **kwargs)
     es = exitSync(obj=dn)
     es.start()
     res = dn.run()
     if res:
-        dn.loop.close()
-        dn.loger.debug("Remove %s", os.path.basename(dn.rang_file))
-        os.remove(dn.rang_file)
+        if os.path.isfile(dn.rang_file):
+            os.remove(dn.rang_file)
+            dn.loger.debug("Remove %s", os.path.basename(dn.rang_file))
     return res

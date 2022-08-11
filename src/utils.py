@@ -34,8 +34,8 @@ class exitSync(Thread):
 
     def signal_handler(self, signum, frame):
         self.obj.write_offset()
-        self.obj.loger.info("Update %s before exit",
-                            os.path.basename(self.obj.rang_file))
+        self.obj.loger.debug("Update %s before exit",
+                             os.path.basename(self.obj.rang_file))
         sys.exit(signum)
 
 
@@ -150,6 +150,8 @@ def parseArg():
                         help="the max number of async concurrency, default: auto", metavar="<int>")
     parser.add_argument('-d', '--debug', action='store_true',
                         help='logging debug', default=False)
+    parser.add_argument('-q', '--quite', action='store_true',
+                        help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
     parser.add_argument("url", type=str,
