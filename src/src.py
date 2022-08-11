@@ -74,9 +74,9 @@ class Download(object):
             req = await self.fetch(session)
             content_length = int(req.headers['content-length'])
             mn_as, mn_pt = get_as_part(content_length)
-            self.threads = min(self.threads, mn_as)
+            # self.threads = min(self.threads, mn_as)
             self.parts = min(self.parts, mn_pt)
-            self.set_sem(self.threads)
+            # self.set_sem(self.threads)
             self.get_range(content_length)
             if len(self.Retry) == 0:
                 self.loger.info("File size: %s (%d bytes)",
@@ -84,8 +84,11 @@ class Download(object):
                 self.loger.info("Starting download %s --> %s",
                                 self.url, self.outfile)
                 self.Retry.append(content_length)
-            self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
-                            self.threads, self.tcp_conn or 100, get_as_part(content_length))
+                self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
+                                self.threads, self.tcp_conn or 100, (mn_as, mn_pt))
+            else:
+                self.loger.debug("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
+                                 self.threads, self.tcp_conn or 100, (mn_as, mn_pt))
             with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
                 tasks = []
                 for h_range in self.range_list:
