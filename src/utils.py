@@ -7,6 +7,7 @@ import logging
 import socket
 import struct
 import asyncio
+import aioftp
 import argparse
 import functools
 
@@ -20,6 +21,7 @@ from ._version import __version__
 
 from aiohttp import ClientSession, TCPConnector, ClientTimeout
 from aiohttp.client_reqrep import ClientRequest
+from aiohttp.client_exceptions import ClientPayloadError
 
 
 class exitSync(Thread):
@@ -146,11 +148,11 @@ def parseArg():
     parser = argparse.ArgumentParser(
         description="An interruptable and resumable download accelerator instead of wget/axel.")
     parser.add_argument("-o", "--output", type=str,
-                        help='output download file', required=True, metavar="<file>")
+                        help='output download file', metavar="<file>")
     parser.add_argument("-n", "--num", type=int,
                         help="the max number of async concurrency (not thread or process), default: auto", metavar="<int>")
     parser.add_argument("-c", "--connections", type=int,
-                        help="the max number of tcp connections. more tcp connections can speedup, but might be forbidden by url server, default: auto", metavar="<int>")
+                        help="the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto", metavar="<int>")
     parser.add_argument('-d', '--debug', action='store_true',
                         help='logging debug', default=False)
     parser.add_argument('-q', '--quite', action='store_true',
@@ -158,5 +160,5 @@ def parseArg():
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
     parser.add_argument("url", type=str,
-                        help="download url, only support http/https", metavar="<str>")
+                        help="download url, http/https/ftp support", metavar="<url>")
     return parser.parse_args()

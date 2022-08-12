@@ -3,13 +3,18 @@
 import os
 import sys
 
+
 from .utils import *
 
 
 class Download(object):
     def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, tcp_conn=None, **kwargs):
         self.url = url
-        self.outfile = os.path.abspath(outfile)
+        if outfile:
+            self.outfile = os.path.abspath(outfile)
+        else:
+            self.outfile = os.path.join(
+                os.getcwd(), os.path.basename(self.url))
         self.outdir = os.path.dirname(self.outfile)
         self.rang_file = self.outfile + ".ht"
         mkdir(self.outdir)
@@ -29,7 +34,13 @@ class Download(object):
         self.quite = quite
         self.extra = kwargs
 
-    def get_range(self, content_length, size=1024 * 1000):
+    async def get_range(self, session, size=1024 * 1000):
+        req = await self.fetch(session)
+        content_length = int(req.headers['content-length'])
+        mn_as, mn_pt = get_as_part(content_length)
+        # self.threads = min(self.threads, mn_as)
+        self.parts = min(self.parts, mn_pt)
+        # self.set_sem(self.threads)
         if os.path.isfile(self.rang_file):
             lines = self.load_offset()
             for line in lines:
@@ -71,24 +82,15 @@ class Download(object):
 
     async def download(self):
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
-            req = await self.fetch(session)
-            content_length = int(req.headers['content-length'])
-            mn_as, mn_pt = get_as_part(content_length)
-            # self.threads = min(self.threads, mn_as)
-            self.parts = min(self.parts, mn_pt)
-            # self.set_sem(self.threads)
-            self.get_range(content_length)
+            await self.get_range(session)
             if len(self.Retry) == 0:
                 self.loger.info("File size: %s (%d bytes)",
-                                human_size(content_length), content_length)
+                                human_size(self.content_length), self.content_length)
                 self.loger.info("Starting download %s --> %s",
                                 self.url, self.outfile)
-                self.Retry.append(content_length)
-                self.loger.info("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
-                                self.threads, self.tcp_conn or 100, (mn_as, mn_pt))
-            else:
-                self.loger.debug("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
-                                 self.threads, self.tcp_conn or 100, (mn_as, mn_pt))
+                self.Retry.append(self.content_length)
+            self.loger.debug("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
+                             self.threads, self.tcp_conn or 100, get_as_part(self.content_length))
             with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
                 tasks = []
                 for h_range in self.range_list:
@@ -100,6 +102,37 @@ class Download(object):
                         session, pbar=bar, headers=h_range.copy())
                     tasks.append(task)
                 await asyncio.gather(*tasks)
+
+    async def download_ftp(self):
+        host, filepath = self.url.split(":")[-1].lstrip("/").split("/", 1)
+        if host and filepath:
+            size = 0
+            if os.path.isfile(self.outfile):
+                size = os.path.getsize(self.outfile)
+            async with aioftp.Client.context(host) as client:
+                if await client.is_file(filepath):
+                    self.loger.info("Logging in as anonymous success")
+                    stat = await client.stat(filepath)
+                    self.content_length = int(stat["size"])
+                    if len(self.Retry) == 0:
+                        self.loger.info("File size: %s (%d bytes)",
+                                        human_size(self.content_length), self.content_length)
+                        self.loger.info("Starting download %s --> %s",
+                                        self.url, self.outfile)
+                        self.Retry.append(self.content_length)
+                    with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True) as bar:
+                        self.loger.debug(
+                            "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
+                        async with client.download_stream(filepath, offset=size) as stream:
+                            with open(self.outfile, size and "ab" or "wb") as f:
+                                f.seek(size, os.SEEK_SET)
+                                async for chunk in stream.iter_by_block(1024):
+                                    if chunk:
+                                        f.write(chunk)
+                                        f.flush()
+                                        bar.update(len(chunk))
+                        self.loger.debug(
+                            "Finished %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
 
     async def fetch(self, session, pbar=None, headers=None):
         if headers:
@@ -119,24 +152,27 @@ class Download(object):
                 self.loger.debug(
                     "Finished %s %s", asyncio.current_task().get_name(), headers["Range"])
         else:
-            async with session.get(self.url) as req:
+            async with session.get(self.url, timeout=10) as req:
                 return req
 
     def set_sem(self, n):
         self.sem = asyncio.Semaphore(n)
 
     def run(self):
-        if not self.url.startswith("http"):
-            self.loger.error("Only http or https urls allowed")
-            sys.exit(1)
         Done = False
         try:
-            self.loop = asyncio.get_event_loop()
-            self.loop.run_until_complete(self.download())
+            if self.url.startswith("http"):
+                self.loop = asyncio.get_event_loop()
+                self.loop.run_until_complete(self.download())
+            elif self.url.startswith("ftp"):
+                asyncio.run(self.download_ftp())
+            else:
+                self.loger.error("Only http/https or ftp urls allowed.")
+                sys.exit(1)
             Done = True
         except Exception as e:
             self.loger.debug(e)
-            # raise e
+            raise e
         finally:
             self.write_offset()
         return Done
@@ -174,7 +210,7 @@ class Download(object):
         return log
 
 
-@retry(wait=wait_fixed(1), retry=retry_if_result(lambda v: not v) | retry_if_exception_type())
+@retry(wait=wait_fixed(1), retry=retry_if_result(lambda v: not v) | retry_if_exception_type(ClientPayloadError))
 def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, **kwargs):
     dn = Download(url=url, outfile=outfile,
                   threads=threads, quite=quite, tcp_conn=tcp_conn, **kwargs)
