@@ -1,5 +1,6 @@
 Cython
 requests
 aiohttp
+aioftp
 tqdm
 tenacity
