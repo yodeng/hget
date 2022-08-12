@@ -41,7 +41,7 @@ class Download(object):
         # self.threads = min(self.threads, mn_as)
         self.parts = min(self.parts, mn_pt)
         # self.set_sem(self.threads)
-        if os.path.isfile(self.rang_file):
+        if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
             lines = self.load_offset()
             for line in lines:
                 if not line.strip():
