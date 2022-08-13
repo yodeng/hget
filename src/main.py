@@ -6,12 +6,10 @@ import os
 import pdb
 import sys
 
-
 from .src import *
 
 
-def main():
-    args = parseArg()
+def _main(args):
     log = loger()
     if args.debug:
         log.setLevel(logging.DEBUG)
@@ -19,6 +17,14 @@ def main():
     if hget(args.url, outfile, args.num, quite=args.quite, tcp_conn=args.connections):
         log.setLevel(logging.INFO)
         log.info("Donwload success")
+
+
+def main():
+    args = parseArg()
+    if args.use_reloader:
+        autoreloader(_main, args)
+    else:
+        _main(args)
 
 
 if __name__ == "__main__":

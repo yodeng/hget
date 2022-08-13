@@ -10,12 +10,12 @@ import asyncio
 import aioftp
 import argparse
 import functools
+import subprocess
 
 from threading import Thread
 from multiprocessing import cpu_count
 
 from tqdm import tqdm
-from tenacity import *
 
 from ._version import __version__
 
@@ -90,9 +90,6 @@ def get_as_part(filesize):
     return max(int(mn_as), min_as), max(int(mn_pt), min_pt)
 
 
-Retry = []
-
-
 class Chunk(object):
     OneK = 1024
     OneM = OneK * OneK
@@ -159,6 +156,34 @@ def parseArg():
                         help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
+    parser.add_argument('--noreload', dest='use_reloader', action='store_false',
+                        help='tells hget to NOT use the auto-reloader')
     parser.add_argument("url", type=str,
                         help="download url, http/https/ftp support", metavar="<url>")
     return parser.parse_args()
+
+
+def restart_with_reloader():
+    new_environ = os.environ.copy()
+    while True:
+        args = [sys.executable] + sys.argv
+        new_environ["RUN_MAIN"] = 'true'
+        exit_code = subprocess.call(args, env=new_environ)
+        if exit_code != 3:
+            return exit_code
+        new_environ["RUN_HGET_FIRST"] = "false"
+        time.sleep(0.1)
+
+
+def autoreloader(main_func, *args, **kwargs):
+    if os.environ.get("RUN_MAIN") == "true":
+        main_func(*args, **kwargs)
+    else:
+        try:
+            exit_code = restart_with_reloader()
+            if exit_code < 0:
+                os.kill(os.getpid(), -exit_code)
+            else:
+                sys.exit(exit_code)
+        except KeyboardInterrupt:
+            pass

@@ -23,7 +23,6 @@ requirements:
         - tqdm
         - aiohttp
         - aioftp
-        - tenacity
 
 about:
     home: https://github.com/yodeng/hget
