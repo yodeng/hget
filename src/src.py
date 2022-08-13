@@ -150,7 +150,7 @@ class Download(object):
                 self.loger.debug(
                     "Finished %s %s", asyncio.current_task().get_name(), headers["Range"])
         else:
-            async with session.get(self.url, timeout=10) as req:
+            async with session.get(self.url, timeout=self.datatimeout) as req:
                 return req
 
     def set_sem(self, n):
@@ -171,7 +171,11 @@ class Download(object):
             Done = True
         except (ClientPayloadError, OSError) as e:
             self.loger.debug(e)
-            sys.exit(3)
+            if os.environ.get("RUN_MAIN") == "true":
+                sys.exit(3)
+            raise e
+        except asyncio.TimeoutError as e:
+            raise TimeoutError("Connect url timeout")
         except Exception as e:
             self.loger.debug(e)
             raise e
