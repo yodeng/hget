@@ -2,7 +2,7 @@
 
 import os
 import sys
-
+import _thread
 
 from .utils import *
 
@@ -109,10 +109,10 @@ class Download(object):
                 size = os.path.getsize(self.outfile)
             async with aioftp.Client.context(host) as client:
                 if await client.is_file(filepath):
-                    self.loger.info("Logging in as anonymous success")
                     stat = await client.stat(filepath)
                     self.content_length = int(stat["size"])
                     if os.getenv("RUN_HGET_FIRST") != 'false':
+                        self.loger.info("Logging in as anonymous success")
                         self.loger.info("File size: %s (%d bytes)",
                                         human_size(self.content_length), self.content_length)
                         self.loger.info("Starting download %s --> %s",
@@ -156,6 +156,7 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     def run(self):
+        _thread.start_new_thread(self.check_offset, (30,))
         Done = False
         try:
             if self.url.startswith("http"):
@@ -208,6 +209,20 @@ class Download(object):
         if self.quite:
             log.setLevel(logging.ERROR)
         return log
+
+    def check_offset(self, timeout=30):
+        while True:
+            o = self.offset.copy()
+            time.sleep(timeout)
+            if o == self.offset.copy():
+                if os.environ.get("RUN_MAIN") == "true":
+                    self.loger.debug(
+                        "Any data gets in %s sec, Exit 3", timeout)
+                else:
+                    self.loger.error(
+                        "Any data gets in %s sec, Exit 3", timeout)
+                self.write_offset()
+                os._exit(3)
 
 
 def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, **kwargs):
