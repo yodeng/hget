@@ -14,7 +14,7 @@ def _main(args):
     if args.debug:
         log.setLevel(logging.DEBUG)
     outfile = args.output
-    if hget(args.url, outfile, args.num, quite=args.quite, tcp_conn=args.connections):
+    if hget(args.url, outfile, args.num, quite=args.quite, tcp_conn=args.connections, timeout=args.timeout):
         log.setLevel(logging.INFO)
         log.info("Donwload success")
 
