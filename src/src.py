@@ -8,7 +8,7 @@ from .utils import *
 
 
 class Download(object):
-    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, tcp_conn=None, **kwargs):
+    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, tcp_conn=None, timeout=30, **kwargs):
         self.url = url
         if outfile:
             self.outfile = os.path.abspath(outfile)
@@ -22,6 +22,7 @@ class Download(object):
         self.parts = Chunk.MAX_PT
         self.tcp_conn = tcp_conn
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
+        self.datatimeout = timeout
         self.connector = TCPConnector(
             limit=self.tcp_conn, verify_ssl=False)
         self.headers = headers
@@ -156,7 +157,7 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     def run(self):
-        _thread.start_new_thread(self.check_offset, (30,))
+        _thread.start_new_thread(self.check_offset, (self.datatimeout,))
         Done = False
         try:
             if self.url.startswith("http"):
@@ -225,7 +226,7 @@ class Download(object):
                 os._exit(3)
 
 
-def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, **kwargs):
+def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, timeout=30, **kwargs):
     dn = Download(url=url, outfile=outfile,
                   threads=threads, quite=quite, tcp_conn=tcp_conn, **kwargs)
     es = exitSync(obj=dn)

@@ -150,6 +150,8 @@ def parseArg():
                         help="the max number of async concurrency (not thread or process), default: auto", metavar="<int>")
     parser.add_argument("-c", "--connections", type=int,
                         help="the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto", metavar="<int>")
+    parser.add_argument('-t', '--timeout', type=int, default=30,
+                        help='timeout for download, 30s by default', metavar="<int>")
     parser.add_argument('-d', '--debug', action='store_true',
                         help='logging debug', default=False)
     parser.add_argument('-q', '--quite', action='store_true',
