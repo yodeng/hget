@@ -30,6 +30,7 @@ class Download(object):
         self.quite = quite
         self.extra = kwargs
         self.ftp = False
+        self.startime = int(time.time())
 
     async def get_range(self, session, size=1024 * 1000):
         req = await self.fetch(session)
@@ -157,6 +158,7 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     def run(self):
+        self.startime = int(time.time())
         _thread.start_new_thread(self.check_offset, (self.datatimeout,))
         Done = False
         try:
@@ -176,7 +178,7 @@ class Download(object):
                 sys.exit(3)
             raise e
         except asyncio.TimeoutError as e:
-            raise TimeoutError("Connect url timeout")
+            raise TimeoutException("Connect url timeout")
         except Exception as e:
             self.loger.debug(e)
             raise e
@@ -187,6 +189,7 @@ class Download(object):
     def write_offset(self):
         if len(self.offset):
             with open(self.rang_file, "wb") as fo:
+                fo.write(struct.pack('<Q', self.startime))
                 fo.write(struct.pack('<Q', len(self.offset)))
                 fo.write(os.urandom(3))
                 for e, s in self.offset.items():
@@ -198,6 +201,7 @@ class Download(object):
     def load_offset(self):
         out = []
         with open(self.rang_file, "rb") as fi:
+            self.startime = struct.unpack('<Q', fi.read(8))[0]
             fileno = struct.unpack('<Q', fi.read(8))[0]
             fi.read(3)
             for i in range(fileno):
@@ -257,4 +261,6 @@ def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, t
         if os.path.isfile(dn.rang_file):
             os.remove(dn.rang_file)
             dn.loger.debug("Remove %s", os.path.basename(dn.rang_file))
+        els = int(time.time()) - dn.startime
+        dn.loger.info("Donwload success, time elapse: %s sec", els)
     return res
