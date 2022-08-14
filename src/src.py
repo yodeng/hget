@@ -33,6 +33,7 @@ class Download(object):
         self.set_sem(self.threads)
         self.quite = quite
         self.extra = kwargs
+        self.ftp = False
 
     async def get_range(self, session, size=1024 * 1000):
         req = await self.fetch(session)
@@ -164,6 +165,7 @@ class Download(object):
                 self.loop = asyncio.get_event_loop()
                 self.loop.run_until_complete(self.download())
             elif self.url.startswith("ftp"):
+                self.ftp = True
                 asyncio.run(self.download_ftp())
             else:
                 self.loger.error("Only http/https or ftp urls allowed.")
@@ -216,18 +218,32 @@ class Download(object):
         return log
 
     def check_offset(self, timeout=30):
+        time.sleep(5)
         while True:
-            o = self.offset.copy()
+            o = self._get_data
             time.sleep(timeout)
-            if o == self.offset.copy():
-                if os.environ.get("RUN_MAIN") == "true":
-                    self.loger.debug(
-                        "Any data gets in %s sec, Exit 3", timeout)
-                else:
-                    self.loger.error(
-                        "Any data gets in %s sec, Exit 3", timeout)
-                self.write_offset()
-                os._exit(3)
+            if o == self._get_data:
+                self._exit_without_data()
+
+    @property
+    def _get_data(self):
+        data = 0
+        if self.ftp:
+            if os.path.isfile(self.outfile):
+                data = os.path.getsize(self.outfile)
+        else:
+            data = self.offset.copy()
+        return data
+
+    def _exit_without_data(self):
+        if os.environ.get("RUN_MAIN") == "true":
+            self.loger.debug(
+                "Any data gets in %s sec, Exit 3", timeout)
+        else:
+            self.loger.error(
+                "Any data gets in %s sec, Exit 3", timeout)
+        self.write_offset()
+        os._exit(3)
 
 
 def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, timeout=30, **kwargs):
