@@ -18,7 +18,7 @@ class Download(object):
         self.outdir = os.path.dirname(self.outfile)
         self.rang_file = self.outfile + ".ht"
         mkdir(self.outdir)
-        self.threads = threads or min(max_async(), threads or Chunk.MAX_AS)
+        self.threads = threads
         self.parts = Chunk.MAX_PT
         self.tcp_conn = tcp_conn
         self.datatimeout = timeout
@@ -27,7 +27,6 @@ class Download(object):
         self.offset = {}
         self.range_list = []
         self.tqdm_init = 0
-        self.set_sem(self.threads)
         self.quite = quite
         self.extra = kwargs
         self.ftp = False
@@ -36,9 +35,8 @@ class Download(object):
         req = await self.fetch(session)
         content_length = int(req.headers['content-length'])
         mn_as, mn_pt = get_as_part(content_length)
-        # self.threads = min(self.threads, mn_as)
+        self.threads = self.threads or min(max_async(), Chunk.MAX_AS, mn_as)
         self.parts = min(self.parts, mn_pt)
-        # self.set_sem(self.threads)
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
             lines = self.load_offset()
             for line in lines:
@@ -84,6 +82,7 @@ class Download(object):
             limit=self.tcp_conn, verify_ssl=False)
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
             await self.get_range(session)
+            self.set_sem(self.threads)
             if os.getenv("RUN_HGET_FIRST") != 'false':
                 self.loger.info("File size: %s (%d bytes)",
                                 human_size(self.content_length), self.content_length)
@@ -223,7 +222,7 @@ class Download(object):
             o = self._get_data
             time.sleep(timeout)
             if o == self._get_data:
-                self._exit_without_data()
+                self._exit_without_data(timeout)
 
     @property
     def _get_data(self):
@@ -235,7 +234,7 @@ class Download(object):
             data = self.offset.copy()
         return data
 
-    def _exit_without_data(self):
+    def _exit_without_data(self, timeout):
         if os.environ.get("RUN_MAIN") == "true":
             self.loger.debug(
                 "Any data gets in %s sec, Exit 3", timeout)
