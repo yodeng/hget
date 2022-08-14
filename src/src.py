@@ -222,6 +222,8 @@ class Download(object):
             o = self._get_data
             time.sleep(timeout)
             if o == self._get_data:
+                if (self.ftp and o == self.content_length) or (len(self.offset) and sum(self.offset[self.content_length][-2:]) == self.content_length):
+                    return
                 self._exit_without_data(timeout)
 
     @property
