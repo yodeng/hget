@@ -232,7 +232,7 @@ class Download(object):
 
 def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, timeout=30, **kwargs):
     dn = Download(url=url, outfile=outfile,
-                  threads=threads, quite=quite, tcp_conn=tcp_conn, **kwargs)
+                  threads=threads, quite=quite, tcp_conn=tcp_conn, timeout=timeout,  **kwargs)
     es = exitSync(obj=dn)
     es.start()
     res = dn.run()
