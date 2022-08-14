@@ -21,10 +21,7 @@ class Download(object):
         self.threads = threads or min(max_async(), threads or Chunk.MAX_AS)
         self.parts = Chunk.MAX_PT
         self.tcp_conn = tcp_conn
-        self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
         self.datatimeout = timeout
-        self.connector = TCPConnector(
-            limit=self.tcp_conn, verify_ssl=False)
         self.headers = headers
         self.headers.update(default_headers)
         self.offset = {}
@@ -82,6 +79,9 @@ class Download(object):
             self.write_offset()
 
     async def download(self):
+        self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
+        self.connector = TCPConnector(
+            limit=self.tcp_conn, verify_ssl=False)
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
             await self.get_range(session)
             if os.getenv("RUN_HGET_FIRST") != 'false':
