@@ -172,7 +172,7 @@ class Download(object):
                 self.loger.error("Only http/https or ftp urls allowed.")
                 sys.exit(1)
             Done = True
-        except reload_exceptions as e:
+        except ReloadException as e:
             self.loger.debug(e)
             if os.environ.get("RUN_MAIN") == "true":
                 sys.exit(3)
