@@ -16,12 +16,11 @@ from threading import Thread
 from multiprocessing import cpu_count
 
 from tqdm import tqdm
-
-from ._version import __version__
-
 from aiohttp import ClientSession, TCPConnector, ClientTimeout
 from aiohttp.client_reqrep import ClientRequest
-from aiohttp.client_exceptions import ClientPayloadError
+from aiohttp.client_exceptions import *
+
+from ._version import __version__
 
 
 class exitSync(Thread):
@@ -55,6 +54,12 @@ default_headers = {
     "Connection": "close",
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
 }
+
+reload_exceptions = tuple([
+    ServerDisconnectedError,
+    OSError,
+    ClientPayloadError,
+])
 
 
 def max_async():
