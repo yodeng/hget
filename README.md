@@ -46,7 +46,7 @@ pip3 install git+https://github.com/yodeng/hget.git
 > Pypi官方源安装
 
 ```shell
-pip3 install hget==1.0.0
+pip3 install hget -U
 ```
 
 

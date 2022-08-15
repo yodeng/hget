@@ -237,7 +237,7 @@ class Download(object):
             if os.path.isfile(self.outfile):
                 data = os.path.getsize(self.outfile)
         else:
-            data = self.offset.copy()
+            data = deepcopy(self.offset)
         return data
 
     def _exit_without_data(self, timeout):
