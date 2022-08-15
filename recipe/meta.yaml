@@ -26,4 +26,4 @@ requirements:
 
 about:
     home: https://github.com/yodeng/hget
-    license: BSD
+    license: MIT
