@@ -12,6 +12,7 @@ import argparse
 import functools
 import subprocess
 
+from copy import deepcopy
 from threading import Thread
 from multiprocessing import cpu_count
 
