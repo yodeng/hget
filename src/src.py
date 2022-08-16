@@ -226,9 +226,17 @@ class Download(object):
             o = self._get_data
             time.sleep(timeout)
             if o == self._get_data:
-                if (self.ftp and o == self.content_length) or (len(self.offset) and sum(self.offset[self.content_length][-2:]) == self.content_length):
+                if (self.ftp and o == self.content_length):
                     return
+                elif len(self.offset):
+                    for k, v in self.offset.items():
+                        if sum(v[-2:]) != k:
+                            break
+                    else:
+                        return
                 self._exit_without_data(timeout)
+            else:
+                self.loger.debug("data is downloading")
 
     @property
     def _get_data(self):

@@ -1,6 +1,6 @@
 ## hget
 
-[![PyPI version](https://img.shields.io/pypi/v/bpan.svg?logo=pypi&logoColor=FFE873)](https://pypi.python.org/pypi/hget)
+[![PyPI version](https://img.shields.io/pypi/v/hget.svg?logo=pypi&logoColor=FFE873)](https://pypi.python.org/pypi/hget)
 
 hget是用于载文件的命令行软件，支持http和ftp两种下载协议(`http/https/ftp`)，采用异步协程并发下载，节省线程开销，提高并发量，支持可中断的，随时恢复的下载方式。在网络不好的情况下，可实现下载速度比`wget/axel`快100~200倍以上。
 
