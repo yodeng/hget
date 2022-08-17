@@ -146,6 +146,7 @@ class Download(object):
                         async for chunk in req.content.iter_chunked(102400):
                             if chunk:
                                 f.write(chunk)
+                                f.flush()
                                 self.offset[e][-1] += len(chunk)
                                 pbar.update(len(chunk))
                 self.loger.debug(
