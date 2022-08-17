@@ -33,29 +33,30 @@ class Download(object):
         self.startime = int(time.time())
 
     async def get_range(self, session, size=1024 * 1000):
-        req = await self.fetch(session)
-        content_length = int(req.headers['content-length'])
-        mn_as, mn_pt = get_as_part(content_length)
-        self.threads = self.threads or min(max_async(), Chunk.MAX_AS, mn_as)
-        self.parts = min(self.parts, mn_pt)
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
-            lines = self.load_offset()
-            for line in lines:
-                if not line.strip():
-                    continue
-                end, start0, start, read = map(int, line.strip().split())
-                self.tqdm_init += start - start0 + 1 + read
-                if read > 0:
-                    start = read - 1 + start
-                    read = 0
-                    self.tqdm_init -= 1
+            self.load_offset()
+            content_length = 0
+            for end, s in self.offset.items():
+                start0, read = s
+                self.tqdm_init += read
+                start = sum(s)
                 rang = {'Range': (start, end)}
-                self.offset[end] = [start0, start, read]
                 self.range_list.append(rang)
-                self.content_length = end
+                content_length = max(content_length, end + 1)
+            mn_as, mn_pt = get_as_part(content_length)
+            self.threads = self.threads or min(
+                max_async(), Chunk.MAX_AS, mn_as)
+            self.parts = min(self.parts, mn_pt)
+            self.content_length = content_length
             self.loger.debug("%s of %s has download" %
                              (self.tqdm_init, self.content_length))
         else:
+            req = await self.fetch(session)
+            content_length = int(req.headers['content-length'])
+            mn_as, mn_pt = get_as_part(content_length)
+            self.threads = self.threads or min(
+                max_async(), Chunk.MAX_AS, mn_as)
+            self.parts = min(self.parts, mn_pt)
             self.content_length = content_length
             if self.parts:
                 size = content_length // self.parts
@@ -65,13 +66,13 @@ class Download(object):
             for i in range(count):
                 start = i * size
                 if i == count - 1:
-                    end = content_length
+                    end = content_length - 1
                 else:
                     end = start + size
                 if i > 0:
                     start += 1
                 rang = {'Range': (start, end)}
-                self.offset[end] = [start, start, 0]
+                self.offset[end] = [start, 0]
                 self.range_list.append(rang)
             if not os.path.isfile(self.outfile):
                 mkfile(self.outfile, self.content_length)
@@ -95,7 +96,7 @@ class Download(object):
                 tasks = []
                 for h_range in self.range_list:
                     s, e = h_range["Range"]
-                    if s == e:
+                    if s > e:
                         continue
                     h_range.update(self.headers)
                     task = self.fetch(
@@ -200,19 +201,17 @@ class Download(object):
                         fo.write(os.urandom(3))
 
     def load_offset(self):
-        out = []
         with open(self.rang_file, "rb") as fi:
             self.startime = struct.unpack('<Q', fi.read(8))[0]
             fileno = struct.unpack('<Q', fi.read(8))[0]
             fi.read(3)
             for i in range(fileno):
                 offset = []
-                for j in range(4):
+                for j in range(3):
                     p = struct.unpack('<Q', fi.read(8))[0]
                     offset.append(p)
                     fi.read(3)
-                out.append("\t".join(map(str, offset)))
-        return out
+                self.offset[offset[0]] = offset[1:]
 
     @property
     def loger(self):
@@ -231,7 +230,7 @@ class Download(object):
                     return
                 elif len(self.offset):
                     for k, v in self.offset.items():
-                        if sum(v[-2:]) != k:
+                        if sum(v) != k+1:
                             break
                     else:
                         return
