@@ -81,7 +81,7 @@ class Download(object):
     async def download(self):
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
         self.connector = TCPConnector(
-            limit=self.tcp_conn, verify_ssl=False)
+            limit=self.tcp_conn, ssl=False)
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
             await self.get_range(session)
             self.set_sem(self.threads)
@@ -153,7 +153,7 @@ class Download(object):
                 self.loger.debug(
                     "Finished %s %s", asyncio.current_task().get_name(), headers["Range"])
         else:
-            async with session.get(self.url, timeout=self.datatimeout) as req:
+            async with session.get(self.url, timeout=self.datatimeout, params=self.extra) as req:
                 return req
 
     def set_sem(self, n):
