@@ -14,6 +14,7 @@ import subprocess
 
 from copy import deepcopy
 from threading import Thread
+from urllib.parse import urlparse
 from multiprocessing import cpu_count
 
 from tqdm import tqdm

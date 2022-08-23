@@ -74,6 +74,11 @@ class Download(object):
                 rang = {'Range': (start, end)}
                 self.offset[end] = [start, 0]
                 self.range_list.append(rang)
+            if self.content_length < 1:
+                self.offset = {}
+                self.loger.error(
+                    "Remote file has no content with filesize 0 bytes.")
+                sys.exit(1)
             if not os.path.isfile(self.outfile):
                 mkfile(self.outfile, self.content_length)
             self.write_offset()
@@ -105,12 +110,14 @@ class Download(object):
                 await asyncio.gather(*tasks)
 
     async def download_ftp(self):
-        host, filepath = self.url.split(":")[-1].lstrip("/").split("/", 1)
+        u = urlparse(self.url)
+        host, filepath = u.hostname, u.path
+        port = u.port or aioftp.DEFAULT_PORT
         if host and filepath:
             size = 0
             if os.path.isfile(self.outfile):
                 size = os.path.getsize(self.outfile)
-            async with aioftp.Client.context(host) as client:
+            async with aioftp.Client.context(host, port) as client:
                 if await client.is_file(filepath):
                     stat = await client.stat(filepath)
                     self.content_length = int(stat["size"])
