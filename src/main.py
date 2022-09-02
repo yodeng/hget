@@ -14,6 +14,8 @@ def _main(args):
     if args.debug:
         log.setLevel(logging.DEBUG)
     outfile = args.output
+    if not outfile and args.dir:
+        outfile = os.path.join(args.dir, os.path.basename(args.url))
     hget(args.url, outfile, args.num, quite=args.quite,
          tcp_conn=args.connections, timeout=args.timeout)
 

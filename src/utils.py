@@ -153,6 +153,8 @@ def parseArg():
         description="An interruptable and resumable download accelerator supplementary of wget/axel.")
     parser.add_argument("-o", "--output", type=str,
                         help='output download file', metavar="<file>")
+    parser.add_argument("--dir", type=str,
+                        help='output download directory', metavar="<dir>")
     parser.add_argument("-n", "--num", type=int,
                         help="the max number of async concurrency (not thread or process), default: auto", metavar="<int>")
     parser.add_argument("-c", "--connections", type=int,
