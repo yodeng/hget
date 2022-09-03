@@ -89,6 +89,7 @@ class Download(object):
             limit=self.tcp_conn, ssl=False)
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
             await self.get_range(session)
+            _thread.start_new_thread(self.check_offset, (self.datatimeout,))
             self.set_sem(self.threads)
             if os.getenv("RUN_HGET_FIRST") != 'false':
                 self.loger.info("File size: %s (%d bytes)",
@@ -113,6 +114,7 @@ class Download(object):
         u = urlparse(self.url)
         host, filepath = u.hostname, u.path
         port = u.port or aioftp.DEFAULT_PORT
+        #path_io = aioftp.pathio.PathIO(timeout=None)
         if host and filepath:
             size = 0
             if os.path.isfile(self.outfile):
@@ -121,6 +123,8 @@ class Download(object):
                 if await client.is_file(filepath):
                     stat = await client.stat(filepath)
                     self.content_length = int(stat["size"])
+                    _thread.start_new_thread(
+                        self.check_offset, (self.datatimeout,))
                     if os.getenv("RUN_HGET_FIRST") != 'false':
                         self.loger.info("Logging in as anonymous success")
                         self.loger.info("File size: %s (%d bytes)",
@@ -131,11 +135,12 @@ class Download(object):
                         self.loger.debug(
                             "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
                         async with client.download_stream(filepath, offset=size) as stream:
-                            with open(self.outfile, size and "ab" or "wb") as f:
-                                f.seek(size, os.SEEK_SET)
+                            # async with path_io.open(self.outfile, mode=size and "ab" or "wb") as f:
+                            with open(self.outfile, mode=size and "ab" or "wb") as f:
                                 async for chunk in stream.iter_by_block(1024):
                                     if chunk:
-                                        f.write(chunk)
+                                        # await f.write(block)
+                                        f.write(block)
                                         f.flush()
                                         bar.update(len(chunk))
                         self.loger.debug(
@@ -168,7 +173,6 @@ class Download(object):
 
     def run(self):
         self.startime = int(time.time())
-        _thread.start_new_thread(self.check_offset, (self.datatimeout,))
         Done = False
         try:
             if self.url.startswith("http"):
