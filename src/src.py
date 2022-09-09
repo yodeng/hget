@@ -183,8 +183,17 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     async def download_s3(self):
-        session = client('s3', config=Config(
-            signature_version=UNSIGNED, max_pool_connections=MAX_S3_CONNECT+1))
+        aws_access_key_id = self.extra['access_key'] or os.getenv(
+            "AWS_ACCESS_KEY")
+        aws_secret_access_key = self.extra['secrets_key'] or os.getenv(
+            'AWS_SECRETS_KEY')
+        if aws_access_key_id and aws_secret_access_key:
+            session = client('s3', aws_access_key_id=aws_access_key_id,
+                             aws_secret_access_key=aws_secret_access_key,
+                             config=Config(max_pool_connections=MAX_S3_CONNECT+1, connect_timeout=self.datatimeout))
+        else:
+            session = client('s3', config=Config(signature_version=UNSIGNED,
+                                                 max_pool_connections=MAX_S3_CONNECT+1, connect_timeout=self.datatimeout))
         self.bucket, self.key = self.url.split(
             ":")[-1].lstrip("/").split("/", 1)
         await self.get_range(session)
