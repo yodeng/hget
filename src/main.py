@@ -17,7 +17,7 @@ def _main(args):
     if not outfile and args.dir:
         outfile = os.path.join(args.dir, os.path.basename(args.url))
     hget(args.url, outfile, args.num, quite=args.quite,
-         tcp_conn=args.connections, timeout=args.timeout)
+         tcp_conn=args.connections, timeout=args.timeout, access_key=args.access_key, secrets_key=args.secrets_key)
 
 
 def main():
