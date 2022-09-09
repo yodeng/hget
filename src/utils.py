@@ -13,14 +13,18 @@ import functools
 import subprocess
 
 from copy import deepcopy
-from threading import Thread
+from threading import Thread, currentThread
 from urllib.parse import urlparse
 from multiprocessing import cpu_count
 
 from tqdm import tqdm
+from boto3 import client
+from botocore.config import Config
+from botocore import UNSIGNED
 from aiohttp import ClientSession, TCPConnector, ClientTimeout
 from aiohttp.client_reqrep import ClientRequest
 from aiohttp.client_exceptions import *
+from concurrent.futures import ThreadPoolExecutor
 
 from ._version import __version__
 
@@ -62,6 +66,8 @@ ReloadException = (
     OSError,
     ClientPayloadError,
 )
+
+MAX_S3_CONNECT = 100
 
 
 def max_async():

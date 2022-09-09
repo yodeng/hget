@@ -2,4 +2,5 @@ Cython
 requests
 aiohttp
 aioftp
+boto3
 tqdm
