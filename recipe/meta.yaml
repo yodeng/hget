@@ -23,6 +23,7 @@ requirements:
         - tqdm
         - aiohttp
         - aioftp
+        - boto3
 
 about:
     home: https://github.com/yodeng/hget

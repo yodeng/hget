@@ -32,7 +32,7 @@ class Download(object):
         self.ftp = False
         self.startime = int(time.time())
 
-    async def get_range(self, session, size=1024 * 1000):
+    async def get_range(self, session=None, size=1024 * 1000):
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
             self.load_offset()
             content_length = 0
@@ -52,7 +52,10 @@ class Download(object):
                              (self.tqdm_init, self.content_length))
         else:
             req = await self.fetch(session)
-            content_length = int(req.headers['content-length'])
+            if not isinstance(req, int):
+                content_length = int(req.headers['content-length'])
+            else:
+                content_length = req
             mn_as, mn_pt = get_as_part(content_length)
             self.threads = self.threads or min(
                 max_async(), Chunk.MAX_AS, mn_as)
@@ -165,11 +168,70 @@ class Download(object):
                 self.loger.debug(
                     "Finished %s %s", asyncio.current_task().get_name(), headers["Range"])
         else:
-            async with session.get(self.url, timeout=self.datatimeout, params=self.extra) as req:
-                return req
+            if not hasattr(session, "head_object"):
+                async with session.get(self.url, timeout=self.datatimeout, params=self.extra) as req:
+                    return req
+            else:
+                content_length = await self.loop.run_in_executor(
+                    None,
+                    self.get_s3_content_length,
+                    session
+                )
+                return content_length
 
     def set_sem(self, n):
         self.sem = asyncio.Semaphore(n)
+
+    async def download_s3(self):
+        session = client('s3', config=Config(
+            signature_version=UNSIGNED, max_pool_connections=MAX_S3_CONNECT+1))
+        self.bucket, self.key = self.url.split(
+            ":")[-1].lstrip("/").split("/", 1)
+        await self.get_range(session)
+        _thread.start_new_thread(self.check_offset, (self.datatimeout,))
+        if os.getenv("RUN_HGET_FIRST") != 'false':
+            self.loger.info("File size: %s (%d bytes)",
+                            human_size(self.content_length), self.content_length)
+            self.loger.info("Starting download %s --> %s",
+                            self.url, self.outfile)
+        self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
+                         self.threads, get_as_part(self.content_length))
+        with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
+            with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
+                tasks = []
+                for h_range in self.range_list:
+                    s, e = h_range["Range"]
+                    if s > e:
+                        continue
+                    task = self.loop.run_in_executor(
+                        exector,
+                        self._download_s3,
+                        session, s, e, bar
+                    )
+                    tasks.append(task)
+                await asyncio.gather(*tasks)
+
+    def _download_s3(self, session, s, e, pbar=None):
+        Range = "bytes=%s-%s" % (s, e)
+        self.loger.debug(
+            "Start %s %s", currentThread().name, Range)
+        response = session.get_object(
+            Bucket=self.bucket, Key=self.key, Range=Range)
+        with open(self.outfile, 'r+b') as f:
+            f.seek(s, os.SEEK_SET)
+            for chunk in response["Body"].iter_chunks(102400):
+                if chunk:
+                    f.write(chunk)
+                    f.flush()
+                    self.offset[e][-1] += len(chunk)
+                    pbar.update(len(chunk))
+        self.loger.debug(
+            "Finished %s %s", currentThread().name, Range)
+
+    def get_s3_content_length(self, session):
+        header = session.head_object(Bucket=self.bucket, Key=self.key)
+        content_length = header["ContentLength"]
+        return content_length
 
     def run(self):
         self.startime = int(time.time())
@@ -181,6 +243,9 @@ class Download(object):
             elif self.url.startswith("ftp"):
                 self.ftp = True
                 asyncio.run(self.download_ftp())
+            elif self.url.startswith("s3"):
+                self.loop = asyncio.get_event_loop()
+                self.loop.run_until_complete(self.download_s3())
             else:
                 self.loger.error("Only http/https or ftp urls allowed.")
                 sys.exit(1)
