@@ -63,7 +63,7 @@ setup(
     url="https://github.com/yodeng/hget",
     # package_dir={PKG: "src"},
     install_requires=get_requirement(),
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     ext_modules=getExtension(),
     long_description=getdes(),
     long_description_content_type='text/markdown',
