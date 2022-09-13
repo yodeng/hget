@@ -124,6 +124,14 @@ def human_size(num):
     return "%.1f%s" % (num, 'Y')
 
 
+def remove_empty_items(data):
+    out = {}
+    for k, v in list(data.items()):
+        if v:
+            out[k] = v
+    return out
+
+
 def loger(logfile=None, level="info"):
     logger = logging.getLogger()
     if level.lower() == "info":
