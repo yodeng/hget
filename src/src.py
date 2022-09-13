@@ -28,7 +28,7 @@ class Download(object):
         self.range_list = []
         self.tqdm_init = 0
         self.quite = quite
-        self.extra = kwargs
+        self.extra = remove_empty_items(kwargs)
         self.ftp = False
         self.startime = int(time.time())
 
@@ -183,9 +183,9 @@ class Download(object):
         self.sem = asyncio.Semaphore(n)
 
     async def download_s3(self):
-        aws_access_key_id = self.extra['access_key'] or os.getenv(
+        aws_access_key_id = self.extra.get('access_key') or os.getenv(
             "AWS_ACCESS_KEY")
-        aws_secret_access_key = self.extra['secrets_key'] or os.getenv(
+        aws_secret_access_key = self.extra.get('secrets_key') or os.getenv(
             'AWS_SECRETS_KEY')
         if aws_access_key_id and aws_secret_access_key:
             session = client('s3', aws_access_key_id=aws_access_key_id,
