@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import signal
@@ -13,7 +14,8 @@ import functools
 import subprocess
 
 from copy import deepcopy
-from threading import Thread, currentThread
+from math import floor, log10
+from threading import Thread, currentThread, RLock
 from urllib.parse import urlparse
 from multiprocessing import cpu_count
 
@@ -116,12 +118,57 @@ class TimeoutException(Exception):
     pass
 
 
+def now():
+    if hasattr(time, 'monotonic'):
+        return time.monotonic
+    return time.time
+
+
+class RateLimit(object):
+    def __init__(self, calls=15, period=1, clock=now()):
+        self.clamped_calls = max(1, min(sys.maxsize, floor(calls)))
+        self.period = period
+        self.clock = clock
+        self.last_reset = clock()
+        self.num_calls = 0
+        self.lock = RLock()
+
+    def wait(self):
+        with self.lock:   # for thread safety
+            period_remaining = self._period_remaining()
+            if period_remaining <= 0:
+                self.num_calls = 0
+                self.last_reset = self.clock()
+            self.num_calls += 1
+            if self.num_calls > self.clamped_calls:
+                time.sleep(period_remaining)
+
+    def _period_remaining(self):
+        elapsed = self.clock() - self.last_reset
+        return self.period - elapsed
+
+    def refresh(self):
+        self.last_reset = self.clock()
+
+
 def human_size(num):
     for unit in ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
         if abs(num) < 1024.0:
             return "%3.1f%s" % (num, unit)
         num /= 1024.0
     return "%.1f%s" % (num, 'Y')
+
+
+def hs_decode(size):
+    s, u = re.search("(\d+)(\D*)", str(size)).group(1, 2)
+    s = int(s)
+    if u:
+        for unit in ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
+            if u.upper()[0] == unit:
+                return s
+            s *= 1024
+    else:
+        return s
 
 
 def remove_empty_items(data):
@@ -175,6 +222,8 @@ def parseArg():
                         help="the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto", metavar="<int>")
     parser.add_argument('-t', '--timeout', type=int, default=30,
                         help='timeout for download, 30s by default', metavar="<int>")
+    parser.add_argument('-s', '--max-speed', type=str,
+                        help='specify maximum speed per second, case-insensitive unit support (K[b], M[b]...), no-limited by default', metavar="<str>")
     parser.add_argument('-d', '--debug', action='store_true',
                         help='logging debug', default=False)
     parser.add_argument('-q', '--quite', action='store_true',
@@ -188,7 +237,7 @@ def parseArg():
     parser.add_argument('--noreload', dest='use_reloader', action='store_false',
                         help='tells hget to NOT use the auto-reloader')
     parser.add_argument("url", type=str,
-                        help="download url, http/https/ftp support", metavar="<url>")
+                        help="download url, http/https/ftp/s3 support", metavar="<url>")
     return parser.parse_args()
 
 
