@@ -118,18 +118,12 @@ class TimeoutException(Exception):
     pass
 
 
-def now():
-    if hasattr(time, 'monotonic'):
-        return time.monotonic
-    return time.time
-
-
 class RateLimit(object):
-    def __init__(self, calls=15, period=1, clock=now()):
+    def __init__(self, calls=15, period=1):
         self.clamped_calls = max(1, min(sys.maxsize, floor(calls)))
         self.period = period
-        self.clock = clock
-        self.last_reset = clock()
+        self.clock = self._now
+        self.last_reset = self._now()
         self.num_calls = 0
         self.lock = RLock()
 
@@ -149,6 +143,12 @@ class RateLimit(object):
 
     def refresh(self):
         self.last_reset = self.clock()
+
+    @property
+    def _now(self):
+        if hasattr(time, 'monotonic'):
+            return time.monotonic
+        return time.time
 
 
 def human_size(num):
