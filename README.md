@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/hget.svg?logo=pypi&logoColor=FFE873)](https://pypi.python.org/pypi/hget)
 
-hget是用于下载文件的命令行软件，支持http和ftp两种下载协议(`http/https/ftp`)，采用异步协程并发下载，节省线程开销，提高并发量，支持可中断的，随时恢复的下载方式。在网络不好的情况下，可实现下载速度比`wget/axel`快100~200倍以上。
+hget是用于下载文件的命令行软件，支持http和ftp两种下载协议(`http/https/ftp`)，优化亚马逊云对象存储数据下载`(aws s3 cp)`，采用异步协程并发下载，节省线程开销，提高并发量，支持可中断的，随时恢复的下载方式。在网络不好的情况下，可实现下载速度比`wget/axel/aws s3 cp`快100~200倍以上。
 
 
 
@@ -59,7 +59,7 @@ pip3 install hget -U
 
 ```shell
 $ hget -h 
-usage: hget [-h] [-o <file>] [-n <int>] [-c <int>] [-t <int>] [-d] [-q] [-v] [--noreload] <url>
+usage: hget [-h] [-o <file>] [--dir <dir>] [-n <int>] [-c <int>] [-t <int>] [-s <str>] [-d] [-q] [-v] [--access-key <str>] [--secrets-key <str>] [--noreload] <url>
 
 An interruptable and resumable download accelerator supplementary of wget/axel.
 
@@ -70,15 +70,20 @@ optional arguments:
   -h, --help            show this help message and exit
   -o <file>, --output <file>
                         output download file
+  --dir <dir>           output download directory
   -n <int>, --num <int>
                         the max number of async concurrency (not thread or process), default: auto
   -c <int>, --connections <int>
                         the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto
   -t <int>, --timeout <int>
                         timeout for download, 30s by default
+  -s <str>, --max-speed <str>
+                        specify maximum speed per second, case-insensitive unit support (K[b], M[b]...), no-limited by default
   -d, --debug           logging debug
   -q, --quite           suppress all output except error or download success
   -v, --version         show program's version number and exit
+  --access-key <str>    access key if there is
+  --secrets-key <str>   secrets key if there is
   --noreload            tells hget to NOT use the auto-reloader
 ```
 
@@ -86,14 +91,17 @@ optional arguments:
 
 | 参数             | 描述                                                         |
 | ---------------- | ------------------------------------------------------------ |
-| \<url\>          | 位置参数，需要下载的网址，以`http/https/ftp`开头             |
+| \<url\>          | 位置参数，需要下载的网址，以`http/https/ftp/s3`开头          |
 | -o/--output      | 下载保存的文件名，默认当前目录下的下载文件                   |
 | -n/--num         | 最大的下载并发量，默认根据下载文件大小自动配置。             |
 | -c/--connections | http协议下载时，最大的tcp连接数，默认根据下载文件大小自动配置，值越大可加速下载，但有可能连接过多被服务端拒绝连接 |
 | -t/--timeout     | 下载连接的最长超时，默认30秒                                 |
-| -d/--debug       | debug模式，更多的logging输出                                 |
+| -s/--max-speed   | 每秒最大数据下载量`(bytes)`，默认无限制，支持不区分大小写的单位`K[B]`，`M[B]`等等 |
+| -d/--debug       | `debug`模式，更多的`logging`输出                             |
 | -q/--quite       | 禁止除错误外的全部屏幕输出                                   |
 | -v/--version     | 打印软件版本并退出                                           |
+| --access-key     | 亚马逊云对象存储访问key，`s3`地址生效，没有可以不提供        |
+| --secrets-key    | 亚马逊云对象存储私有key，`s3`地址生效，没有可以不提供        |
 | --noreload       | 禁止自动重载，当网络异常或程序异常中断情况下，不进行重置并继续下载 |
 
 + `-c/--connections`： 最大tcp连接数，自动选择即可，如果要配置，建议不要超过500
@@ -136,8 +144,8 @@ hget(url=url, outfile=outfile, quite=False)
 
 #### 6. 说明
 
-+ hget异步下载，目前对http下载做了并发优化处理，ftp下载暂时只支持断点续传
-+ 由于并发较大，可能会遇到部分网站服务端拒绝连接的情况，通常几分钟后即可恢复，可通过减少TCP连接和并发量参数控制
++ hget异步下载，对http下载做了并发优化处理，ftp下载只支持断点续传
++ 由于并发较大，可能会遇到部分网站服务端拒绝连接的情况，通常几分钟后即可恢复，可通过减少TCP连接和并发量参数控制，也可以通过设置最大下载速度控制
 + hget只是提供普通下载，请勿用于爬虫或恶意网络连接，产生一切责任由使用者承担
 
 

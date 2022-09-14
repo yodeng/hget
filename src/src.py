@@ -29,8 +29,12 @@ class Download(object):
         self.tqdm_init = 0
         self.quite = quite
         self.extra = remove_empty_items(kwargs)
+        self.max_speed = hs_decode(self.extra.get("max_speed") or sys.maxsize)
+        self.chunk_size = 102400
         self.ftp = False
         self.startime = int(time.time())
+        self.rate_limiter = RateLimit(
+            max(int(float(self.max_speed)/self.chunk_size), 1))
 
     async def get_range(self, session=None, size=1024 * 1000):
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
@@ -103,6 +107,7 @@ class Download(object):
                              self.threads, self.tcp_conn or 100, get_as_part(self.content_length))
             with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
                 tasks = []
+                self.rate_limiter.refresh()
                 for h_range in self.range_list:
                     s, e = h_range["Range"]
                     if s > e:
@@ -139,10 +144,15 @@ class Download(object):
                             "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
                         async with client.download_stream(filepath, offset=size) as stream:
                             # async with path_io.open(self.outfile, mode=size and "ab" or "wb") as f:
+                            chunk_size = self.chunk_size/100
+                            self.rate_limiter.clamped_calls = max(
+                                1, int(float(self.max_speed)/chunk_size))
+                            self.rate_limiter.refresh()
                             with open(self.outfile, mode=size and "ab" or "wb") as f:
-                                async for chunk in stream.iter_by_block(1024):
+                                async for chunk in stream.iter_by_block(chunk_size):
                                     if chunk:
                                         # await f.write(block)
+                                        self.rate_limiter.wait()
                                         f.write(block)
                                         f.flush()
                                         bar.update(len(chunk))
@@ -159,8 +169,9 @@ class Download(object):
                 async with session.get(self.url, headers=headers, timeout=self.timeout, params=self.extra) as req:
                     with open(self.outfile, 'r+b') as f:
                         f.seek(s, os.SEEK_SET)
-                        async for chunk in req.content.iter_chunked(102400):
+                        async for chunk in req.content.iter_chunked(self.chunk_size):
                             if chunk:
+                                self.rate_limiter.wait()
                                 f.write(chunk)
                                 f.flush()
                                 self.offset[e][-1] += len(chunk)
@@ -194,8 +205,8 @@ class Download(object):
         else:
             session = client('s3', config=Config(signature_version=UNSIGNED,
                                                  max_pool_connections=MAX_S3_CONNECT+1, connect_timeout=self.datatimeout))
-        self.bucket, self.key = self.url.split(
-            ":")[-1].lstrip("/").split("/", 1)
+        u = urlparse(self.url)
+        self.bucket, self.key = u.hostname, u.path.lstrip("/")
         await self.get_range(session)
         _thread.start_new_thread(self.check_offset, (self.datatimeout,))
         if os.getenv("RUN_HGET_FIRST") != 'false':
@@ -206,6 +217,7 @@ class Download(object):
         self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
                          self.threads, get_as_part(self.content_length))
         with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
+            self.rate_limiter.refresh()
             with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
                 tasks = []
                 for h_range in self.range_list:
@@ -228,8 +240,9 @@ class Download(object):
             Bucket=self.bucket, Key=self.key, Range=Range)
         with open(self.outfile, 'r+b') as f:
             f.seek(s, os.SEEK_SET)
-            for chunk in response["Body"].iter_chunks(102400):
+            for chunk in response["Body"].iter_chunks(self.chunk_size):
                 if chunk:
+                    self.rate_limiter.wait()
                     f.write(chunk)
                     f.flush()
                     self.offset[e][-1] += len(chunk)
