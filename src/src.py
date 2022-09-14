@@ -30,13 +30,13 @@ class Download(object):
         self.quite = quite
         self.extra = remove_empty_items(kwargs)
         self.max_speed = hs_decode(self.extra.get("max_speed") or sys.maxsize)
-        self.chunk_size = 102400
+        self.chunk_size = 100 * Chunk.OneK
         self.ftp = False
         self.startime = int(time.time())
         self.rate_limiter = RateLimit(
             max(int(float(self.max_speed)/self.chunk_size), 1))
 
-    async def get_range(self, session=None, size=1024 * 1000):
+    async def get_range(self, session=None, size=1000*Chunk.OneK):
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
             self.load_offset()
             content_length = 0
@@ -105,7 +105,7 @@ class Download(object):
                                 self.url, self.outfile)
             self.loger.debug("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
                              self.threads, self.tcp_conn or 100, get_as_part(self.content_length))
-            with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
+            with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                 tasks = []
                 self.rate_limiter.refresh()
                 for h_range in self.range_list:
@@ -139,7 +139,7 @@ class Download(object):
                                         human_size(self.content_length), self.content_length)
                         self.loger.info("Starting download %s --> %s",
                                         self.url, self.outfile)
-                    with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True) as bar:
+                    with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                         self.loger.debug(
                             "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
                         async with client.download_stream(filepath, offset=size) as stream:
@@ -216,7 +216,7 @@ class Download(object):
                             self.url, self.outfile)
         self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
                          self.threads, get_as_part(self.content_length))
-        with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True) as bar:
+        with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
             self.rate_limiter.refresh()
             with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
                 tasks = []
