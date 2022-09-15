@@ -144,7 +144,7 @@ class Download(object):
                             "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
                         async with client.download_stream(filepath, offset=size) as stream:
                             # async with path_io.open(self.outfile, mode=size and "ab" or "wb") as f:
-                            chunk_size = self.chunk_size/100
+                            chunk_size = self.chunk_size//100
                             self.rate_limiter.clamped_calls = max(
                                 1, int(float(self.max_speed)/chunk_size))
                             self.rate_limiter.refresh()
@@ -153,7 +153,7 @@ class Download(object):
                                     if chunk:
                                         # await f.write(block)
                                         self.rate_limiter.wait()
-                                        f.write(block)
+                                        f.write(chunk)
                                         f.flush()
                                         bar.update(len(chunk))
                         self.loger.debug(
