@@ -22,7 +22,6 @@ requirements:
         - requests
         - tqdm
         - aiohttp
-        - aioftp
         - boto3
 
 about:

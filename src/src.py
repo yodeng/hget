@@ -118,46 +118,51 @@ class Download(object):
                     tasks.append(task)
                 await asyncio.gather(*tasks)
 
-    async def download_ftp(self):
+    def download_ftp(self):
         u = urlparse(self.url)
-        host, filepath = u.hostname, u.path
-        port = u.port or aioftp.DEFAULT_PORT
-        #path_io = aioftp.pathio.PathIO(timeout=None)
-        if host and filepath:
+        host, self.filepath = u.hostname, u.path
+        port = u.port or 21
+        if host and self.filepath:
             size = 0
             if os.path.isfile(self.outfile):
                 size = os.path.getsize(self.outfile)
-            async with aioftp.Client.context(host, port) as client:
-                if await client.is_file(filepath):
-                    stat = await client.stat(filepath)
-                    self.content_length = int(stat["size"])
-                    _thread.start_new_thread(
-                        self.check_offset, (self.datatimeout,))
-                    if os.getenv("RUN_HGET_FIRST") != 'false':
-                        self.loger.info("Logging in as anonymous success")
-                        self.loger.info("File size: %s (%d bytes)",
-                                        human_size(self.content_length), self.content_length)
-                        self.loger.info("Starting download %s --> %s",
-                                        self.url, self.outfile)
-                    with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
-                        self.loger.debug(
-                            "Start %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
-                        async with client.download_stream(filepath, offset=size) as stream:
-                            # async with path_io.open(self.outfile, mode=size and "ab" or "wb") as f:
-                            chunk_size = self.chunk_size//100
-                            self.rate_limiter.clamped_calls = max(
-                                1, int(float(self.max_speed)/chunk_size))
-                            self.rate_limiter.refresh()
-                            with open(self.outfile, mode=size and "ab" or "wb") as f:
-                                async for chunk in stream.iter_by_block(chunk_size):
-                                    if chunk:
-                                        # await f.write(block)
-                                        self.rate_limiter.wait()
-                                        f.write(chunk)
-                                        f.flush()
-                                        bar.update(len(chunk))
-                        self.loger.debug(
-                            "Finished %s %s", asyncio.current_task().get_name(), 'bytes={0}-{1}'.format(size, self.content_length))
+            ftp = FTP()
+            ftp.connect(host, port=port, timeout=self.datatimeout)
+            ftp.login()
+            _thread.start_new_thread(
+                self.check_offset, (self.datatimeout,))
+            self.content_length = ftp.size(self.filepath)
+            if os.getenv("RUN_HGET_FIRST") != 'false':
+                self.loger.info("Logging in as anonymous success")
+                self.loger.info("File size: %s (%d bytes)",
+                                human_size(self.content_length), self.content_length)
+                self.loger.info("Starting download %s --> %s",
+                                self.url, self.outfile)
+            with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+                self.loger.debug(
+                    "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
+                ftp.voidcmd('TYPE I')
+                with ftp.transfercmd("RETR " + self.filepath, rest=size) as conn:
+                    self.chunk_size = self.chunk_size//100
+                    self.rate_limiter.clamped_calls = max(
+                        1, int(float(self.max_speed)/self.chunk_size))
+                    self.rate_limiter.refresh()
+                    with open(self.outfile, mode="ab") as f:
+                        while True:
+                            chunk = conn.recv(self.chunk_size)
+                            if not chunk:
+                                break
+                            self.rate_limiter.wait()
+                            f.write(chunk)
+                            f.flush()
+                            bar.update(len(chunk))
+                # ftp.voidresp()
+                self.loger.debug(
+                    "Finished %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
+            try:
+                ftp.quit()
+            except:
+                ftp.close()
 
     async def fetch(self, session, pbar=None, headers=None):
         if headers:
@@ -179,16 +184,18 @@ class Download(object):
                 self.loger.debug(
                     "Finished %s %s", asyncio.current_task().get_name(), headers["Range"])
         else:
-            if not hasattr(session, "head_object"):
-                async with session.get(self.url, timeout=self.datatimeout, params=self.extra) as req:
-                    return req
-            else:
+            if hasattr(session, "head_object"):
                 content_length = await self.loop.run_in_executor(
                     None,
                     self.get_s3_content_length,
                     session
                 )
                 return content_length
+            elif hasattr(session, "size"):
+                return session.size(self.filepath)
+            else:
+                async with session.get(self.url, headers=self.headers, timeout=self.datatimeout, params=self.extra) as req:
+                    return req
 
     def set_sem(self, n):
         self.sem = asyncio.Semaphore(n)
@@ -264,7 +271,7 @@ class Download(object):
                 self.loop.run_until_complete(self.download())
             elif self.url.startswith("ftp"):
                 self.ftp = True
-                asyncio.run(self.download_ftp())
+                self.download_ftp()
             elif self.url.startswith("s3"):
                 self.loop = asyncio.get_event_loop()
                 self.loop.run_until_complete(self.download_s3())
