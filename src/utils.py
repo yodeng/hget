@@ -8,7 +8,6 @@ import logging
 import socket
 import struct
 import asyncio
-import aioftp
 import argparse
 import functools
 import subprocess
@@ -20,6 +19,7 @@ from urllib.parse import urlparse
 from multiprocessing import cpu_count
 
 from tqdm import tqdm
+from ftplib import FTP
 from boto3 import client
 from botocore.config import Config
 from botocore import UNSIGNED
@@ -60,6 +60,7 @@ class KeepAliveClientRequest(ClientRequest):
 
 default_headers = {
     "Connection": "close",
+    "Accept-Encoding": "identity",
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
 }
 
@@ -265,3 +266,24 @@ def autoreloader(main_func, *args, **kwargs):
                 sys.exit(exit_code)
         except KeyboardInterrupt:
             pass
+
+
+def download_ftp_file(host, ftpath, localpath, bar=None):
+    ftp = FTP()
+    ftp.connect(host, port=21)
+    ftp.login()
+    ftp.voidcmd('TYPE I')
+    length = ftp.size(ftpath)
+    s = 0
+    if os.path.isfile(localpath):
+        s = os.path.getsize(localpath)
+    if s >= length:
+        return
+    with ftp.transfercmd("RETR " + ftpath, rest=s) as conn:
+        with open(localpath, "ab") as fo:
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+                fo.write(data)
+    # ftp.voidresp()
