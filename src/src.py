@@ -33,6 +33,7 @@ class Download(object):
         self.chunk_size = 100 * Chunk.OneK
         self.ftp = False
         self.startime = int(time.time())
+        self.current = current_process()
         self.rate_limiter = RateLimit(
             max(int(float(self.max_speed)/self.chunk_size), 1))
 
@@ -105,7 +106,9 @@ class Download(object):
                                 self.url, self.outfile)
             self.loger.debug("Ranges: %s, Sem: %s, Connections: %s, %s", self.parts,
                              self.threads, self.tcp_conn or 100, get_as_part(self.content_length))
-            with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+            pos = len(
+                self.current._identity) and self.current._identity[0]-1 or None
+            with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                 tasks = []
                 self.rate_limiter.refresh()
                 for h_range in self.range_list:
@@ -138,7 +141,9 @@ class Download(object):
                                 human_size(self.content_length), self.content_length)
                 self.loger.info("Starting download %s --> %s",
                                 self.url, self.outfile)
-            with tqdm(disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+            pos = len(
+                self.current._identity) and self.current._identity[0]-1 or None
+            with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                 self.loger.debug(
                     "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
                 ftp.voidcmd('TYPE I')
@@ -223,7 +228,9 @@ class Download(object):
                             self.url, self.outfile)
         self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
                          self.threads, get_as_part(self.content_length))
-        with tqdm(disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+        pos = len(
+            self.current._identity) and self.current._identity[0]-1 or None
+        with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
             self.rate_limiter.refresh()
             with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
                 tasks = []
@@ -267,13 +274,13 @@ class Download(object):
         Done = False
         try:
             if self.url.startswith("http"):
-                self.loop = asyncio.get_event_loop()
+                self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download())
             elif self.url.startswith("ftp"):
                 self.ftp = True
                 self.download_ftp()
             elif self.url.startswith("s3"):
-                self.loop = asyncio.get_event_loop()
+                self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
             else:
                 self.loger.error("Only http/https or ftp urls allowed.")
@@ -320,7 +327,10 @@ class Download(object):
 
     @property
     def loger(self):
-        log = logging.getLogger()
+        if self.current.name == "MainProcess":
+            log = logging.getLogger()
+        else:
+            log = get_logger()
         if self.quite:
             log.setLevel(logging.ERROR)
         return log
