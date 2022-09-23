@@ -276,12 +276,14 @@ class Download(object):
             if self.url.startswith("http"):
                 self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download())
+                self.loop.close()
             elif self.url.startswith("ftp"):
                 self.ftp = True
                 self.download_ftp()
             elif self.url.startswith("s3"):
                 self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
+                self.loop.close()
             else:
                 self.loger.error("Only http/https or ftp urls allowed.")
                 sys.exit(1)
