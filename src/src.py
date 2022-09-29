@@ -285,7 +285,7 @@ class Download(object):
                 self.loop.run_until_complete(self.download_s3())
                 self.loop.close()
             else:
-                self.loger.error("Only http/https or ftp urls allowed.")
+                self.loger.error("Only http/https/s3/ftp urls allowed.")
                 sys.exit(1)
             Done = True
         except ReloadException as e:

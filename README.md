@@ -106,9 +106,9 @@ optional arguments:
 + `-c/--connections`： 最大tcp连接数，自动选择即可，如果要配置，建议不要超过500
 + `-n/--num`:  最大并发量，自动选择即可，如果要配置，建议不要超过1000，否则可能会超出系统`ulimit`限制而被杀掉
 
-
-
 ##### 4.2 python module import usage
+
+> Simple usage
 
 ```python
 from hget import hget
@@ -119,9 +119,19 @@ outfile="./hg19.fa.gz"
 hget(url=url, outfile=outfile, quite=False)
 ```
 
+> Parallel usage
+
+```python
+from joblib import Parallel, delayed
+from hget import hget
+
+urls = ["https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz",
+        "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz"]
+
+Parallel(n_jobs=2)(delayed(hget)(url) for url in urls)
+```
+
 + `import`调用方式不支持`auto-reload`
-
-
 
 #### 5. 测试
 

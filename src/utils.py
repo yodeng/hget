@@ -23,7 +23,7 @@ from ftplib import FTP
 from boto3 import client
 from botocore.config import Config
 from botocore import UNSIGNED
-from aiohttp import ClientSession, TCPConnector, ClientTimeout
+from aiohttp import ClientSession, TCPConnector, ClientTimeout, hdrs
 from aiohttp.client_reqrep import ClientRequest
 from aiohttp.client_exceptions import *
 from concurrent.futures import ThreadPoolExecutor
@@ -59,9 +59,9 @@ class KeepAliveClientRequest(ClientRequest):
 
 
 default_headers = {
-    "Connection": "close",
-    "Accept-Encoding": "identity",
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
+    hdrs.CONNECTION: "close",
+    hdrs.ACCEPT_ENCODING: "identity",
+    hdrs.USER_AGENT: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
 }
 
 ReloadException = (
