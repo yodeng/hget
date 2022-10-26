@@ -284,6 +284,23 @@ class Download(object):
                 self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
                 self.loop.close()
+            elif self.url.endswith(".ht"):
+                self.rang_file = self.url
+                try:
+                    self.load_offset()
+                except:
+                    self.loger.error("Only http/https/s3/ftp urls allowed.")
+                    sys.exit(1)
+                done, content_length = 0, 0
+                for e, s in self.offset.items():
+                    l = [e, ] + s
+                    done += l[-1]
+                    content_length = max(content_length, e+1)
+                    sys.stdout.write("\t".join(map(str, l)) + "\n")
+                sys.stdout.write("Start time: %s, %s of %s finished\n" % (time.strftime(
+                    "%F %X", time.localtime(self.startime)), human_size(done), human_size(content_length)))
+                self.offset.clear()
+                sys.exit()
             else:
                 self.loger.error("Only http/https/s3/ftp urls allowed.")
                 sys.exit(1)
