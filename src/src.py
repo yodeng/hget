@@ -29,7 +29,8 @@ class Download(object):
         self.tqdm_init = 0
         self.quite = quite
         self.extra = remove_empty_items(kwargs)
-        self.max_speed = hs_decode(self.extra.get("max_speed") or sys.maxsize)
+        self.max_speed = hs_decode(self.extra.get(
+            "max_speed") or sys.maxsize) + hs_decode("200K")
         self.chunk_size = 100 * Chunk.OneK
         self.ftp = False
         self.startime = int(time.time())
@@ -297,8 +298,8 @@ class Download(object):
                     done += l[-1]
                     content_length = max(content_length, e+1)
                     sys.stdout.write("\t".join(map(str, l)) + "\n")
-                sys.stdout.write("Start time: %s, %s of %s finished\n" % (time.strftime(
-                    "%F %X", time.localtime(self.startime)), human_size(done), human_size(content_length)))
+                sys.stdout.write("Start time: %s, %s of %s (%.2f%%) finished\n" % (time.strftime(
+                    "%F %X", time.localtime(self.startime)), human_size(done), human_size(content_length), float(done)/content_length*100))
                 self.offset.clear()
                 sys.exit()
             else:

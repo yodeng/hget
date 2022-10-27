@@ -161,15 +161,15 @@ def human_size(num):
 
 
 def hs_decode(size):
-    s, u = re.search("(\d+)(\D*)", str(size)).group(1, 2)
-    s = int(s)
+    s, u = re.search("(\d+(?:\.\d+)?)(\D*)", str(size)).group(1, 2)
+    s = float(s)
     if u:
         for unit in ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
             if u.upper()[0] == unit:
-                return s
+                return int(s)
             s *= 1024
     else:
-        return s
+        return int(s)
 
 
 def remove_empty_items(data):
