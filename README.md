@@ -21,6 +21,7 @@ hget是用于下载文件的命令行软件，支持http和ftp两种下载协议
 + Cython
 + requests
 + aiohttp
++ boto3
 + tqdm
 
 

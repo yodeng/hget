@@ -2,4 +2,5 @@ Cython
 requests
 aiohttp
 boto3
+joblib
 tqdm

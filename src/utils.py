@@ -17,6 +17,7 @@ from math import floor, log10
 from threading import Thread, currentThread, RLock
 from urllib.parse import urlparse
 from multiprocessing import cpu_count, current_process, get_logger
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from tqdm import tqdm
 from ftplib import FTP
@@ -287,3 +288,30 @@ def download_ftp_file(host, ftpath, localpath, bar=None):
                     break
                 fo.write(data)
     # ftp.voidresp()
+
+
+def add_bytes_range(start, end, headers):
+    if start is None:
+        if end is None:
+            return
+        else:
+            bytes_range = "0-{:d}".format(end)
+    else:
+        if end is None:
+            if start < 0:
+                bytes_range = "{:d}".format(start)
+            else:
+                bytes_range = "{:d}-".format(start)
+        else:
+            bytes_range = "{:d}-{:d}".format(start, end)
+    headers["Range"] = "bytes=" + bytes_range
+
+
+def add_query_parameters(media_url, query_params):
+    if len(query_params) == 0:
+        return media_url
+    scheme, netloc, path, query, frag = urlsplit(media_url)
+    params = parse_qs(query)
+    new_params = {**params, **query_params}
+    query = urlencode(new_params, doseq=True)
+    return urlunsplit((scheme, netloc, path, query, frag))
