@@ -14,8 +14,8 @@ import subprocess
 
 from copy import deepcopy
 from math import floor, log10
-from threading import Thread, currentThread, RLock
 from urllib.parse import urlparse
+from threading import Thread, currentThread, RLock, Lock
 from multiprocessing import cpu_count, current_process, get_logger
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
