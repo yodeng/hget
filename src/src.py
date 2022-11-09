@@ -37,6 +37,7 @@ class Download(object):
         self.current = current_process()
         self.rate_limiter = RateLimit(
             max(int(float(self.max_speed)/self.chunk_size), 1))
+        self.lock = Lock()
 
     async def get_range(self, session=None, size=1000*Chunk.OneK):
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
@@ -99,6 +100,7 @@ class Download(object):
         async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
             await self.get_range(session)
             _thread.start_new_thread(self.check_offset, (self.datatimeout,))
+            _thread.start_new_thread(self._auto_write_offset, ())
             self.set_sem(self.threads)
             if os.getenv("RUN_HGET_FIRST") != 'false':
                 self.loger.info("File size: %s (%d bytes)",
@@ -222,6 +224,7 @@ class Download(object):
         self.bucket, self.key = u.hostname, u.path.lstrip("/")
         await self.get_range(session)
         _thread.start_new_thread(self.check_offset, (self.datatimeout,))
+        _thread.start_new_thread(self._auto_write_offset, ())
         if os.getenv("RUN_HGET_FIRST") != 'false':
             self.loger.info("File size: %s (%d bytes)",
                             human_size(self.content_length), self.content_length)
@@ -320,17 +323,23 @@ class Download(object):
             self.write_offset()
         return Done
 
+    def _auto_write_offset(self, ivs=10):
+        while True:
+            time.sleep(ivs)
+            self.write_offset()
+
     def write_offset(self):
         if len(self.offset):
-            with open(self.rang_file, "wb") as fo:
-                fo.write(struct.pack('<Q', self.startime))
-                fo.write(struct.pack('<Q', len(self.offset)))
-                fo.write(os.urandom(3))
-                for e, s in self.offset.items():
-                    l = [e, ] + s
-                    for i in l:
-                        fo.write(struct.pack('<Q', int(i)))
-                        fo.write(os.urandom(3))
+            with self.lock:
+                with open(self.rang_file, "wb") as fo:
+                    fo.write(struct.pack('<Q', self.startime))
+                    fo.write(struct.pack('<Q', len(self.offset)))
+                    fo.write(os.urandom(3))
+                    for e, s in self.offset.items():
+                        l = [e, ] + s
+                        for i in l:
+                            fo.write(struct.pack('<Q', int(i)))
+                            fo.write(os.urandom(3))
 
     def load_offset(self):
         with open(self.rang_file, "rb") as fi:
