@@ -22,8 +22,9 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from tqdm import tqdm
 from ftplib import FTP
 from boto3 import client
-from botocore.config import Config
 from botocore import UNSIGNED
+from botocore.config import Config
+from botocore.exceptions import ReadTimeoutError
 from aiohttp import ClientSession, TCPConnector, ClientTimeout, hdrs
 from aiohttp.client_reqrep import ClientRequest
 from aiohttp.client_exceptions import *
@@ -69,6 +70,7 @@ ReloadException = (
     ServerDisconnectedError,
     OSError,
     ClientPayloadError,
+    ReadTimeoutError,
 )
 
 MAX_S3_CONNECT = 100
