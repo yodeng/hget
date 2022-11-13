@@ -249,6 +249,7 @@ class Download(object):
                     )
                     tasks.append(task)
                 await asyncio.gather(*tasks)
+        session.close()
 
     def _download_s3(self, session, s, e, pbar=None):
         Range = "bytes=%s-%s" % (s, e)
