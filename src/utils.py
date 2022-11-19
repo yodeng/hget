@@ -122,6 +122,10 @@ class TimeoutException(Exception):
     pass
 
 
+class DownloadError(Exception):
+    pass
+
+
 class RateLimit(object):
     def __init__(self, calls=15, period=1):
         self.clamped_calls = max(1, min(sys.maxsize, floor(calls)))
@@ -230,7 +234,7 @@ def parseArg():
                         help='specify maximum speed per second, case-insensitive unit support (K[b], M[b]...), no-limited by default', metavar="<str>")
     parser.add_argument('-d', '--debug', action='store_true',
                         help='logging debug', default=False)
-    parser.add_argument('-q', '--quite', action='store_true',
+    parser.add_argument('-q', '--quiet', action='store_true',
                         help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)

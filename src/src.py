@@ -8,7 +8,7 @@ from .utils import *
 
 
 class Download(object):
-    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quite=False, tcp_conn=None, timeout=30, **kwargs):
+    def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quiet=False, tcp_conn=None, timeout=30, **kwargs):
         self.url = url
         if outfile:
             self.outfile = os.path.abspath(outfile)
@@ -27,7 +27,7 @@ class Download(object):
         self.offset = {}
         self.range_list = []
         self.tqdm_init = 0
-        self.quite = quite
+        self.quiet = quiet
         self.extra = remove_empty_items(kwargs)
         self.max_speed = hs_decode(self.extra.get(
             "max_speed") or sys.maxsize) + hs_decode("200K")
@@ -59,36 +59,44 @@ class Download(object):
                              (self.tqdm_init, self.content_length))
         else:
             req = await self.fetch(session)
+            if req.status == 404:
+                raise DownloadError("ERROR 404: Not Found")
             if not isinstance(req, int):
                 content_length = int(req.headers['content-length'])
             else:
                 content_length = req
-            mn_as, mn_pt = get_as_part(content_length)
-            self.threads = self.threads or min(
-                max_async(), Chunk.MAX_AS, mn_as)
-            self.parts = min(self.parts, mn_pt)
             self.content_length = content_length
-            if self.parts:
-                size = content_length // self.parts
-                count = self.parts
-            else:
-                count = content_length // size
-            for i in range(count):
-                start = i * size
-                if i == count - 1:
-                    end = content_length - 1
-                else:
-                    end = start + size
-                if i > 0:
-                    start += 1
-                rang = {'Range': (start, end)}
-                self.offset[end] = [start, 0]
-                self.range_list.append(rang)
             if self.content_length < 1:
                 self.offset = {}
                 self.loger.error(
                     "Remote file has no content with filesize 0 bytes.")
                 sys.exit(1)
+            if "accept-ranges" not in req.headers:
+                rang = {'Range': (0, content_length-1)}
+                self.offset[content_length-1] = [0, 0]
+                self.range_list.append(rang)
+                self.threads = self.parts = 1
+            else:
+                mn_as, mn_pt = get_as_part(content_length)
+                self.threads = self.threads or min(
+                    max_async(), Chunk.MAX_AS, mn_as)
+                self.parts = min(self.parts, mn_pt)
+                if self.parts:
+                    size = content_length // self.parts
+                    count = self.parts
+                else:
+                    count = content_length // size
+                for i in range(count):
+                    start = i * size
+                    if i == count - 1:
+                        end = content_length - 1
+                    else:
+                        end = start + size
+                    if i > 0:
+                        start += 1
+                    rang = {'Range': (start, end)}
+                    self.offset[end] = [start, 0]
+                    self.range_list.append(rang)
             if not os.path.isfile(self.outfile):
                 mkfile(self.outfile, self.content_length)
             self.write_offset()
@@ -111,7 +119,7 @@ class Download(object):
                              self.threads, self.tcp_conn or 100, get_as_part(self.content_length))
             pos = len(
                 self.current._identity) and self.current._identity[0]-1 or None
-            with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+            with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                 tasks = []
                 self.rate_limiter.refresh()
                 for h_range in self.range_list:
@@ -146,7 +154,7 @@ class Download(object):
                                 self.url, self.outfile)
             pos = len(
                 self.current._identity) and self.current._identity[0]-1 or None
-            with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+            with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
                 self.loger.debug(
                     "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
                 ftp.voidcmd('TYPE I')
@@ -234,7 +242,7 @@ class Download(object):
                          self.threads, get_as_part(self.content_length))
         pos = len(
             self.current._identity) and self.current._identity[0]-1 or None
-        with tqdm(position=pos, disable=self.quite, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+        with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
             self.rate_limiter.refresh()
             with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
                 tasks = []
@@ -361,7 +369,7 @@ class Download(object):
             log = logging.getLogger()
         else:
             log = get_logger()
-        if self.quite:
+        if self.quiet:
             log.setLevel(logging.ERROR)
         return log
 
@@ -404,9 +412,9 @@ class Download(object):
         os._exit(3)
 
 
-def hget(url="", outfile="", threads=Chunk.MAX_AS, quite=False, tcp_conn=None, timeout=30, **kwargs):
+def hget(url="", outfile="", threads=Chunk.MAX_AS, quiet=False, tcp_conn=None, timeout=30, **kwargs):
     dn = Download(url=url, outfile=outfile,
-                  threads=threads, quite=quite, tcp_conn=tcp_conn, timeout=timeout,  **kwargs)
+                  threads=threads, quiet=quiet, tcp_conn=tcp_conn, timeout=timeout,  **kwargs)
     es = exitSync(obj=dn)
     es.start()
     res = dn.run()
