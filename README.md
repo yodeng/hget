@@ -81,7 +81,7 @@ optional arguments:
   -s <str>, --max-speed <str>
                         specify maximum speed per second, case-insensitive unit support (K[b], M[b]...), no-limited by default
   -d, --debug           logging debug
-  -q, --quite           suppress all output except error or download success
+  -q, --quiet           suppress all output except error or download success
   -v, --version         show program's version number and exit
   --access-key <str>    access key if there is
   --secrets-key <str>   secrets key if there is
@@ -99,7 +99,7 @@ optional arguments:
 | -t/--timeout     | 下载连接的最长超时，默认30秒                                 |
 | -s/--max-speed   | 每秒最大数据下载量`(bytes)`，默认无限制，支持不区分大小写的单位`K[B]`，`M[B]`等等 |
 | -d/--debug       | `debug`模式，更多的`logging`输出                             |
-| -q/--quite       | 禁止除错误外的全部屏幕输出                                   |
+| -q/--quiet       | 禁止除错误外的全部屏幕输出                                   |
 | -v/--version     | 打印软件版本并退出                                           |
 | --access-key     | 亚马逊云对象存储访问key，`s3`地址生效，没有可以不提供        |
 | --secrets-key    | 亚马逊云对象存储私有key，`s3`地址生效，没有可以不提供        |
@@ -118,7 +118,7 @@ from hget import hget
 url="https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz"
 outfile="./hg19.fa.gz"
 
-hget(url=url, outfile=outfile, quite=False)
+hget(url=url, outfile=outfile, quiet=False)
 ```
 
 > Parallel usage
