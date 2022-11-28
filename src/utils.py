@@ -238,10 +238,11 @@ def parseArg():
                         help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
-    parser.add_argument('--access-key', dest='access_key', type=str,
-                        help='access key if there is', metavar="<str>")
-    parser.add_argument('--secrets-key', dest='secrets_key', type=str,
-                        help='secrets key if there is', metavar="<str>")
+    aws = parser.add_argument_group("aws arguments")
+    aws.add_argument('--access-key', dest='access_key', type=str,
+                     help='access key if necessary', metavar="<str>")
+    aws.add_argument('--secrets-key', dest='secrets_key', type=str,
+                     help='secrets key if necessary', metavar="<str>")
     parser.add_argument('--noreload', dest='use_reloader', action='store_false',
                         help='tells hget to NOT use the auto-reloader')
     parser.add_argument("url", type=str,
