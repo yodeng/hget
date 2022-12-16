@@ -59,9 +59,9 @@ class Download(object):
                              (self.tqdm_init, self.content_length))
         else:
             req = await self.fetch(session)
-            if req.status == 404:
-                raise DownloadError("ERROR 404: Not Found")
             if not isinstance(req, int):
+                if req.status == 404:
+                    raise DownloadError("ERROR 404: Not Found")
                 content_length = int(req.headers['content-length'])
             else:
                 content_length = req
@@ -71,7 +71,7 @@ class Download(object):
                 self.loger.error(
                     "Remote file has no content with filesize 0 bytes.")
                 sys.exit(1)
-            if "accept-ranges" not in req.headers:
+            if hasattr(req, "headers") and "accept-ranges" not in req.headers:
                 rang = {'Range': (0, content_length-1)}
                 self.offset[content_length-1] = [0, 0]
                 self.range_list.append(rang)
