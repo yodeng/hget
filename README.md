@@ -62,10 +62,10 @@ pip3 install hget -U
 $ hget -h 
 usage: hget [-h] [-o <file>] [--dir <dir>] [-n <int>] [-c <int>] [-t <int>] [-s <str>] [-d] [-q] [-v] [--access-key <str>] [--secrets-key <str>] [--noreload] <url>
 
-An interruptable and resumable download accelerator supplementary of wget/axel.
+An interruptable and resumable download accelerator.
 
 positional arguments:
-  <url>                 download url, http/https/ftp support
+  <url>                 download url, http/https/s3/ftp support
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -83,9 +83,11 @@ optional arguments:
   -d, --debug           logging debug
   -q, --quiet           suppress all output except error or download success
   -v, --version         show program's version number and exit
-  --access-key <str>    access key if there is
-  --secrets-key <str>   secrets key if there is
   --noreload            tells hget to NOT use the auto-reloader
+
+aws arguments:
+  --access-key <str>    access key if necessary
+  --secrets-key <str>   secrets key if necessary
 ```
 
 命令和参数解释如下:
