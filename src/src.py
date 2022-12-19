@@ -61,7 +61,7 @@ class Download(object):
             req = await self.fetch(session)
             if not isinstance(req, int):
                 if req.status == 404:
-                    raise DownloadError("ERROR 404: Not Found")
+                    raise DownloadError("ERROR 404: %s Not Found" % self.url)
                 content_length = int(req.headers['content-length'])
             else:
                 content_length = req
@@ -297,8 +297,9 @@ class Download(object):
                 self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
                 self.loop.close()
-            elif self.url.endswith(".ht"):
-                self.rang_file = self.url
+            elif os.path.isfile(self.url) and (self.url.endswith(".ht") or os.path.isfile(self.url+".ht")):
+                self.rang_file = self.url.endswith(
+                    ".ht") and self.url or self.url+".ht"
                 try:
                     self.load_offset()
                 except:
