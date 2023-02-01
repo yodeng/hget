@@ -14,7 +14,7 @@ class Download(object):
             self.outfile = os.path.abspath(outfile)
         else:
             self.outfile = os.path.join(
-                os.getcwd(), os.path.basename(self.url))
+                os.getcwd(), os.path.basename(urlparse(self.url).path))
         self.outdir = os.path.dirname(self.outfile)
         self.rang_file = self.outfile + ".ht"
         mkdir(self.outdir)
