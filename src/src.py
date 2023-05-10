@@ -60,8 +60,12 @@ class Download(object):
         else:
             req = await self.fetch(session)
             if not isinstance(req, int):
-                if req.status == 404:
-                    raise DownloadError("ERROR 404: %s Not Found" % self.url)
+                if 400 <= req.status < 500:
+                    raise DownloadError(
+                        "Client ERROR %s: %s bad request" % (req.status, self.url))
+                elif 500 <= req.status:
+                    raise DownloadError(
+                        "Server ERROR %s: %s bad request" % (req.status, self.url))
                 content_length = int(req.headers['content-length'])
             else:
                 content_length = req
