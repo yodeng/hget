@@ -60,12 +60,14 @@ pip3 install hget -U
 
 ```shell
 $ hget -h 
-usage: hget [-h] [-o <file>] [--dir <dir>] [-n <int>] [-c <int>] [-t <int>] [-s <str>] [-d] [-q] [-v] [--access-key <str>] [--secrets-key <str>] [--noreload] <url>
+usage: hget [-h] [-o <file>] [--dir <dir>] [-n <int>] [-c <int>] [-t <int>] [-s <str>] [-d] [-q] [-v] [-p <str>] [--proxy-user <str>] [--proxy-password <str>] [--use-proxy-env] [--noreload]
+            [--access-key <str>] [--secrets-key <str>]
+            <url>
 
-An interruptable and resumable download accelerator.
+An interruptable and resumable download accelerator supplementary of wget/axel.
 
 positional arguments:
-  <url>                 download url, http/https/s3/ftp support
+  <url>                 download url, http/https/ftp/s3 support
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -85,6 +87,14 @@ optional arguments:
   -v, --version         show program's version number and exit
   --noreload            tells hget to NOT use the auto-reloader
 
+proxy arguments:
+  -p <str>, --proxy <str>
+                        proxy url, statswith http/https
+  --proxy-user <str>    set USER as proxy username
+  --proxy-password <str>
+                        set PASS as proxy password
+  --use-proxy-env       use HTTP_PROXY or HTTPS_PROXY environment variables for proxy url
+
 aws arguments:
   --access-key <str>    access key if necessary
   --secrets-key <str>   secrets key if necessary
@@ -103,6 +113,10 @@ aws arguments:
 | -d/--debug       | `debug`模式，更多的`logging`输出                             |
 | -q/--quiet       | 禁止除错误外的全部屏幕输出                                   |
 | -v/--version     | 打印软件版本并退出                                           |
+| -p/--proxy       | 使用的代理url                                                |
+| --proxy-user     | 使用的代理用户名                                             |
+| --proxy-password | 使用的代理密码                                               |
+| --use-proxy-env  | 使用系统环境变量HTTP_PROXY或HTTPS_PROXY environment的值作为代理url |
 | --access-key     | 亚马逊云对象存储访问key，`s3`地址生效，没有可以不提供        |
 | --secrets-key    | 亚马逊云对象存储私有key，`s3`地址生效，没有可以不提供        |
 | --noreload       | 禁止自动重载，当网络异常或程序异常中断情况下，不进行重置并继续下载 |

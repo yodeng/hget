@@ -109,7 +109,10 @@ class Download(object):
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
         self.connector = TCPConnector(
             limit=self.tcp_conn, ssl=False)
-        async with ClientSession(connector=self.connector, timeout=self.timeout) as session:
+        trust_env = False
+        if self.extra.get("proxy_env"):
+            trust_env = self.extra.pop("proxy_env")
+        async with ClientSession(connector=self.connector, timeout=self.timeout, trust_env=trust_env) as session:
             await self.get_range(session)
             _thread.start_new_thread(self.check_offset, (self.datatimeout,))
             _thread.start_new_thread(self._auto_write_offset, ())
@@ -191,7 +194,11 @@ class Download(object):
                 headers["Range"] = 'bytes={0}-{1}'.format(s, e)
                 self.loger.debug(
                     "Start %s %s", asyncio.current_task().get_name(), headers["Range"])
-                async with session.get(self.url, headers=headers, timeout=self.timeout, params=self.extra) as req:
+                proxy, proxy_auth = self.extra.get("proxy"), None
+                if self.extra.get("proxy_user") and self.extra.get("proxy_pass") and self.extra.get("proxy"):
+                    proxy_auth = BasicAuth(self.extra.get(
+                        "proxy_user"), self.extra.get("proxy_pass"))
+                async with session.get(self.url, headers=headers, timeout=self.timeout, params=self.extra, proxy=proxy, proxy_auth=proxy_auth) as req:
                     with open(self.outfile, 'r+b') as f:
                         f.seek(s, os.SEEK_SET)
                         async for chunk in req.content.iter_chunked(self.chunk_size):

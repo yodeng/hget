@@ -19,6 +19,7 @@ def _main(args):
     hget(args.url, outfile, args.num, quiet=args.quiet,
          tcp_conn=args.connections, timeout=args.timeout,
          access_key=args.access_key, secrets_key=args.secrets_key,
+         proxy=args.proxy, proxy_user=args.proxy_user, proxy_pass=args.proxy_password, proxy_env=args.use_proxy_env,
          max_speed=args.max_speed)
 
 

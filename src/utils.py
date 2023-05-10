@@ -25,7 +25,7 @@ from boto3 import client
 from botocore import UNSIGNED
 from botocore.config import Config
 from botocore.exceptions import ReadTimeoutError
-from aiohttp import ClientSession, TCPConnector, ClientTimeout, hdrs
+from aiohttp import ClientSession, TCPConnector, ClientTimeout, BasicAuth, hdrs
 from aiohttp.client_reqrep import ClientRequest
 from aiohttp.client_exceptions import *
 from concurrent.futures import ThreadPoolExecutor
@@ -238,15 +238,24 @@ def parseArg():
                         help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
+    parser.add_argument('--noreload', dest='use_reloader', action='store_false',
+                        help='tells hget to NOT use the auto-reloader')
+    parser.add_argument("url", type=str,
+                        help="download url, http/https/ftp/s3 support", metavar="<url>")
+    proxy = parser.add_argument_group("proxy arguments")
+    proxy.add_argument('-p', '--proxy', type=str,
+                       help='proxy url, statswith http/https', metavar="<str>")
+    proxy.add_argument('--proxy-user', type=str,
+                       help='set USER as proxy username', metavar="<str>")
+    proxy.add_argument('--proxy-password', type=str,
+                       help='set PASS as proxy password', metavar="<str>")
+    proxy.add_argument('--use-proxy-env', default=False, action='store_true',
+                       help='use HTTP_PROXY or HTTPS_PROXY environment variables for proxy url')
     aws = parser.add_argument_group("aws arguments")
     aws.add_argument('--access-key', dest='access_key', type=str,
                      help='access key if necessary', metavar="<str>")
     aws.add_argument('--secrets-key', dest='secrets_key', type=str,
                      help='secrets key if necessary', metavar="<str>")
-    parser.add_argument('--noreload', dest='use_reloader', action='store_false',
-                        help='tells hget to NOT use the auto-reloader')
-    parser.add_argument("url", type=str,
-                        help="download url, http/https/ftp/s3 support", metavar="<url>")
     return parser.parse_args()
 
 
