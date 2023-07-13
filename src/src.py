@@ -206,12 +206,14 @@ class Download(object):
                         if not chunk:
                             break
                         if cur+len(chunk) <= end:
+                            self.rate_limiter.wait()
                             f.write(chunk)
                             f.flush()
                             self.offset[e][-1] += len(chunk)
                             pbar.update(len(chunk))
                             cur += len(chunk)
                         else:
+                            self.rate_limiter.wait()
                             chunk = chunk[:(end-cur)]
                             f.write(chunk)
                             f.flush()

@@ -13,9 +13,9 @@ def download_ftp_by_threads(url, outfile, threads=10, quiet=False):
         mkfile(outfile, content_length)
     range_list = _split_range(content_length, threads)
     with tqdm(total=content_length, disable=quiet, initial=0, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
-        with ThreadPoolExecutor(threads) as pool:
+        with ThreadPoolExecutor(threads) as exector:
             for s, e in range_list:
-                pool.submit(download_ftp_range, url, outfile, s, e, bar)
+                exector.submit(download_ftp_range, url, outfile, s, e, bar)
 
 
 def _split_range(length, threads):
