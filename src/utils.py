@@ -172,6 +172,8 @@ def human_size(num):
 def hs_decode(size):
     s, u = re.search("(\d+(?:\.\d+)?)(\D*)", str(size)).group(1, 2)
     s = float(s)
+    if s < 1 and not u:
+        u = "M"
     if u:
         for unit in ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
             if u.upper()[0] == unit:

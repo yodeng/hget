@@ -31,7 +31,7 @@ class Download(object):
         self.quiet = quiet
         self.extra = remove_empty_items(kwargs)
         self.max_speed = hs_decode(self.extra.get(
-            "max_speed") or sys.maxsize) + hs_decode("200K")
+            "max_speed") or sys.maxsize)
         self.chunk_size = 100 * Chunk.OneK
         self.ftp = False
         self.startime = int(time.time())
