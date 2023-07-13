@@ -8,6 +8,7 @@ from .utils import *
 
 
 class Download(object):
+
     def __init__(self, url="", outfile="", threads=Chunk.MAX_AS, headers={}, quiet=False, tcp_conn=None, timeout=30, **kwargs):
         self.url = url
         if outfile:
@@ -150,41 +151,39 @@ class Download(object):
             ftp = FTP()
             ftp.connect(host, port=port, timeout=self.datatimeout)
             ftp.login()
+            ftp.set_pasv(False)
             _thread.start_new_thread(
                 self.check_offset, (self.datatimeout,))
-            self.content_length = ftp.size(self.filepath)
-            if os.getenv("RUN_HGET_FIRST") != 'false':
-                self.loger.info("Logging in as anonymous success")
-                self.loger.info("File size: %s (%d bytes)",
-                                human_size(self.content_length), self.content_length)
-                self.loger.info("Starting download %s --> %s",
-                                self.url, self.outfile)
-            pos = len(
-                self.current._identity) and self.current._identity[0]-1 or None
-            with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
-                self.loger.debug(
-                    "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
-                ftp.voidcmd('TYPE I')
-                with ftp.transfercmd("RETR " + self.filepath, rest=size) as conn:
-                    self.chunk_size = self.chunk_size//100
-                    self.rate_limiter.clamped_calls = max(
-                        1, int(float(self.max_speed)/self.chunk_size))
-                    self.rate_limiter.refresh()
-                    with open(self.outfile, mode="ab") as f:
-                        while True:
-                            chunk = conn.recv(self.chunk_size)
-                            if not chunk:
-                                break
-                            self.rate_limiter.wait()
-                            f.write(chunk)
-                            f.flush()
-                            bar.update(len(chunk))
-                # ftp.voidresp()
-                self.loger.debug(
-                    "Finished %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
             try:
-                ftp.quit()
-            except:
+                self.content_length = ftp.size(self.filepath)
+                if os.getenv("RUN_HGET_FIRST") != 'false':
+                    self.loger.info("Logging in as anonymous success")
+                    self.loger.info("File size: %s (%d bytes)",
+                                    human_size(self.content_length), self.content_length)
+                    self.loger.info("Starting download %s --> %s",
+                                    self.url, self.outfile)
+                pos = len(
+                    self.current._identity) and self.current._identity[0]-1 or None
+                with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+                    self.loger.debug(
+                        "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
+                    ftp.voidcmd('TYPE I')
+                    with ftp.transfercmd("RETR " + self.filepath, rest=size) as conn:
+                        self.chunk_size = self.chunk_size//100
+                        self.rate_limiter.clamped_calls = max(
+                            1, int(float(self.max_speed)/self.chunk_size))
+                        self.rate_limiter.refresh()
+                        with open(self.outfile, mode="ab") as f:
+                            while True:
+                                chunk = conn.recv(self.chunk_size)
+                                if not chunk:
+                                    break
+                                self.rate_limiter.wait()
+                                f.write(chunk)
+                                bar.update(len(chunk))
+                    self.loger.debug(
+                        "Finished %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
+            finally:
                 ftp.close()
 
     async def fetch(self, session, pbar=None, headers=None):
