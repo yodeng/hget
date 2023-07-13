@@ -227,9 +227,9 @@ def parseArg():
     parser.add_argument("--dir", type=str,
                         help='output download directory', metavar="<dir>")
     parser.add_argument("-n", "--num", type=int,
-                        help="the max number of async concurrency (not thread or process), default: auto", metavar="<int>")
+                        help="the max number of async concurrency, default: auto", metavar="<int>")
     parser.add_argument("-c", "--connections", type=int,
-                        help="the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto", metavar="<int>")
+                        help="the max number of connections, default: auto", metavar="<int>")
     parser.add_argument('-t', '--timeout', type=int, default=30,
                         help='timeout for download, 30s by default', metavar="<int>")
     parser.add_argument('-s', '--max-speed', type=str,
@@ -241,7 +241,7 @@ def parseArg():
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
     parser.add_argument('--noreload', dest='use_reloader', action='store_false',
-                        help='tells hget to NOT use the auto-reloader')
+                        help='not use the auto-reloader')
     parser.add_argument("url", type=str,
                         help="download url, http/https/ftp/s3 support", metavar="<url>")
     proxy = parser.add_argument_group("proxy arguments")
@@ -285,27 +285,6 @@ def autoreloader(main_func, *args, **kwargs):
                 sys.exit(exit_code)
         except KeyboardInterrupt:
             pass
-
-
-def download_ftp_file(host, ftpath, localpath, bar=None):
-    ftp = FTP()
-    ftp.connect(host, port=21)
-    ftp.login()
-    ftp.voidcmd('TYPE I')
-    length = ftp.size(ftpath)
-    s = 0
-    if os.path.isfile(localpath):
-        s = os.path.getsize(localpath)
-    if s >= length:
-        return
-    with ftp.transfercmd("RETR " + ftpath, rest=s) as conn:
-        with open(localpath, "ab") as fo:
-            while True:
-                data = conn.recv(1024)
-                if not data:
-                    break
-                fo.write(data)
-    # ftp.voidresp()
 
 
 def add_bytes_range(start, end, headers):
