@@ -140,51 +140,88 @@ class Download(object):
                     tasks.append(task)
                 await asyncio.gather(*tasks)
 
-    def download_ftp(self):
+    async def download_ftp(self):
         u = urlparse(self.url)
         host, self.filepath = u.hostname, u.path
         port = u.port or 21
         if host and self.filepath:
-            size = 0
-            if os.path.isfile(self.outfile):
-                size = os.path.getsize(self.outfile)
             ftp = FTP()
             ftp.connect(host, port=port, timeout=self.datatimeout)
             ftp.login()
-            ftp.set_pasv(False)
-            _thread.start_new_thread(
-                self.check_offset, (self.datatimeout,))
             try:
-                self.content_length = ftp.size(self.filepath)
-                if os.getenv("RUN_HGET_FIRST") != 'false':
-                    self.loger.info("Logging in as anonymous success")
-                    self.loger.info("File size: %s (%d bytes)",
-                                    human_size(self.content_length), self.content_length)
-                    self.loger.info("Starting download %s --> %s",
-                                    self.url, self.outfile)
-                pos = len(
-                    self.current._identity) and self.current._identity[0]-1 or None
-                with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=size, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
-                    self.loger.debug(
-                        "Start %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
-                    ftp.voidcmd('TYPE I')
-                    with ftp.transfercmd("RETR " + self.filepath, rest=size) as conn:
-                        self.chunk_size = self.chunk_size//100
-                        self.rate_limiter.clamped_calls = max(
-                            1, int(float(self.max_speed)/self.chunk_size))
-                        self.rate_limiter.refresh()
-                        with open(self.outfile, mode="ab") as f:
-                            while True:
-                                chunk = conn.recv(self.chunk_size)
-                                if not chunk:
-                                    break
-                                self.rate_limiter.wait()
-                                f.write(chunk)
-                                bar.update(len(chunk))
-                    self.loger.debug(
-                        "Finished %s %s", currentThread().name, 'bytes={0}-{1}'.format(size, self.content_length))
+                await self.get_range(ftp)
             finally:
                 ftp.close()
+            _thread.start_new_thread(self.check_offset, (self.datatimeout,))
+            _thread.start_new_thread(self._auto_write_offset, ())
+            if os.getenv("RUN_HGET_FIRST") != 'false':
+                self.loger.info("Logging in as anonymous success")
+                self.loger.info("File size: %s (%d bytes)",
+                                human_size(self.content_length), self.content_length)
+                self.loger.info("Starting download %s --> %s",
+                                self.url, self.outfile)
+            self.threads = min(self.threads, MAX_FTP_CONNECT)
+            self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
+                             self.threads, get_as_part(self.content_length))
+            pos = len(
+                self.current._identity) and self.current._identity[0]-1 or None
+            with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+                self.rate_limiter.refresh()
+                with ThreadPoolExecutor(self.threads) as exector:
+                    tasks = []
+                    for h_range in self.range_list:
+                        s, e = h_range["Range"]
+                        if s > e:
+                            continue
+                        task = self.loop.run_in_executor(
+                            exector,
+                            self._download_ftp,
+                            s, e, bar
+                        )
+                        tasks.append(task)
+                    await asyncio.gather(*tasks)
+
+    def _download_ftp(self, s=0, e=sys.maxsize, pbar=None):
+        Range = "bytes=%s-%s" % (s, e)
+        self.loger.debug(
+            "Start %s %s", currentThread().name, Range)
+        s = max(s-1, 0)
+        end = e
+        if e+1 == self.content_length:
+            end += 1
+        u = urlparse(self.url)
+        host, filepath = u.hostname, u.path
+        port = u.port or 21
+        ftp = FTP()
+        ftp.connect(host, port=port, timeout=self.datatimeout)
+        ftp.login()
+        ftp.set_pasv(False)
+        try:
+            with ftp.transfercmd("RETR " + filepath, rest=s) as conn:
+                with open(self.outfile, mode="r+b") as f:
+                    f.seek(s)
+                    cur = s
+                    while True:
+                        chunk = conn.recv(self.chunk_size)
+                        if not chunk:
+                            break
+                        if cur+len(chunk) <= end:
+                            f.write(chunk)
+                            f.flush()
+                            self.offset[e][-1] += len(chunk)
+                            pbar.update(len(chunk))
+                            cur += len(chunk)
+                        else:
+                            chunk = chunk[:(end-cur)]
+                            f.write(chunk)
+                            f.flush()
+                            self.offset[e][-1] += len(chunk)
+                            pbar.update(len(chunk))
+                            break
+            self.loger.debug(
+                "Finished %s %s", currentThread().name, Range)
+        finally:
+            ftp.close()
 
     async def fetch(self, session, pbar=None, headers=None):
         if headers:
@@ -248,13 +285,14 @@ class Download(object):
                             human_size(self.content_length), self.content_length)
             self.loger.info("Starting download %s --> %s",
                             self.url, self.outfile)
+        self.threads = min(self.threads, MAX_S3_CONNECT)
         self.loger.debug("Ranges: %s, Sem: %s, %s", self.parts,
                          self.threads, get_as_part(self.content_length))
         pos = len(
             self.current._identity) and self.current._identity[0]-1 or None
         with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
             self.rate_limiter.refresh()
-            with ThreadPoolExecutor(min(self.threads, MAX_S3_CONNECT)) as exector:
+            with ThreadPoolExecutor(self.threads) as exector:
                 tasks = []
                 for h_range in self.range_list:
                     s, e = h_range["Range"]
@@ -302,7 +340,9 @@ class Download(object):
                 self.loop.close()
             elif self.url.startswith("ftp"):
                 self.ftp = True
-                self.download_ftp()
+                self.loop = asyncio.new_event_loop()
+                self.loop.run_until_complete(self.download_ftp())
+                self.loop.close()
             elif self.url.startswith("s3"):
                 self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
@@ -390,9 +430,7 @@ class Download(object):
             o = self._get_data
             time.sleep(timeout)
             if o == self._get_data:
-                if (self.ftp and o == self.content_length):
-                    return
-                elif len(self.offset):
+                if len(self.offset):
                     for k, v in self.offset.items():
                         if sum(v) != k+1:
                             break
@@ -404,13 +442,7 @@ class Download(object):
 
     @property
     def _get_data(self):
-        data = 0
-        if self.ftp:
-            if os.path.isfile(self.outfile):
-                data = os.path.getsize(self.outfile)
-        else:
-            data = deepcopy(self.offset)
-        return data
+        return deepcopy(self.offset)
 
     def _exit_without_data(self, timeout):
         if os.environ.get("RUN_MAIN") == "true":

@@ -15,12 +15,12 @@ import subprocess
 from copy import deepcopy
 from math import floor, log10
 from urllib.parse import urlparse
+from ftplib import FTP, error_temp, error_perm
 from threading import Thread, currentThread, RLock, Lock
 from multiprocessing import cpu_count, current_process, get_logger
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from tqdm import tqdm
-from ftplib import FTP
 from boto3 import client
 from botocore import UNSIGNED
 from botocore.config import Config
@@ -71,9 +71,11 @@ ReloadException = (
     OSError,
     ClientPayloadError,
     ReadTimeoutError,
+    error_temp,
+    error_perm,
 )
 
-MAX_S3_CONNECT = 100
+MAX_S3_CONNECT = MAX_FTP_CONNECT = 100
 
 
 def max_async():

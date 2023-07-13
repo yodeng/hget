@@ -75,7 +75,7 @@ optional arguments:
                         output download file
   --dir <dir>           output download directory
   -n <int>, --num <int>
-                        the max number of async concurrency (not thread or process), default: auto
+                        the max number of concurrency, default: auto
   -c <int>, --connections <int>
                         the max number of tcp connections for http/https. more tcp connections can speedup, but might be forbidden by url server, default: auto
   -t <int>, --timeout <int>
@@ -171,7 +171,7 @@ Parallel(n_jobs=2)(delayed(hget)(url) for url in urls)
 
 #### 6. 说明
 
-+ hget异步下载，对http下载做了并发优化处理，ftp下载只支持断点续传
++ hget异步下载，对下载做了并发优化处理
 + 由于并发较大，可能会遇到部分网站服务端拒绝连接的情况，通常几分钟后即可恢复，可通过减少TCP连接和并发量参数控制，也可以通过设置最大下载速度控制
 + hget只是提供普通下载，请勿用于爬虫或恶意网络连接，产生一切责任由使用者承担
 
