@@ -28,17 +28,25 @@ def _split_range(length, threads):
     return range_list
 
 
-def _get_length(url):
+def login(url, timeout=30):
     u = urlparse(url)
     host, filepath = u.hostname, u.path
+    if not host or not filepath:
+        raise DownloadError("url %s parse error" % url)
     port = u.port or 21
     ftp = FTP()
-    ftp.connect(host, port=port, timeout=5)
+    ftp.connect(host, port=port, timeout=timeout)
     ftp.login()
+    ftp.set_pasv(False)
+    return ftp, filepath
+
+
+def _get_length(url):
+    ftp, filepath = login(url, timeout=5)
     try:
         length = ftp.size(filepath)
     except:
-        raise OSError("get file size error")
+        raise DownloadError("get %s file size error" % url)
     else:
         return length
     finally:
@@ -46,13 +54,7 @@ def _get_length(url):
 
 
 def download_ftp_range(url, outfile, s=0, e=sys.maxsize, pbar=None):
-    u = urlparse(url)
-    host, filepath = u.hostname, u.path
-    port = u.port or 21
-    ftp = FTP()
-    ftp.connect(host, port=port, timeout=5)
-    ftp.login()
-    ftp.set_pasv(False)
+    ftp, filepath = login(url, timeout=5)
     try:
         with ftp.transfercmd("RETR " + filepath, rest=s) as conn:
             with open(outfile, mode="r+b") as f:
