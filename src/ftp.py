@@ -37,7 +37,7 @@ def login(url, timeout=30):
     ftp = FTP()
     ftp.connect(host, port=port, timeout=timeout)
     ftp.login()
-    ftp.set_pasv(False)
+    ftp.set_pasv(True)  # True: Passive mode
     return ftp, filepath
 
 
