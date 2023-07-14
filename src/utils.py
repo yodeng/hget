@@ -223,7 +223,7 @@ def mkfile(filename, size):
 
 def parseArg():
     parser = argparse.ArgumentParser(
-        description="An interruptable and resumable download accelerator supplementary of wget/axel.")
+        description="An interruptable and resumable download accelerator for http/https/s3/ftp.")
     parser.add_argument("-o", "--output", type=str,
                         help='output download file', metavar="<file>")
     parser.add_argument("--dir", type=str,
