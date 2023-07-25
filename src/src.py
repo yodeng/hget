@@ -307,16 +307,16 @@ class Download(object):
         Done = False
         try:
             if self.url.startswith("http"):
-                self.loop = asyncio.get_event_loop()
+                self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download())
                 self.loop.close()
             elif self.url.startswith("ftp"):
                 self.ftp = True
-                self.loop = asyncio.get_event_loop()
+                self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_ftp())
                 self.loop.close()
             elif self.url.startswith("s3"):
-                self.loop = asyncio.get_event_loop()
+                self.loop = asyncio.new_event_loop()
                 self.loop.run_until_complete(self.download_s3())
                 self.loop.close()
             elif os.path.isfile(self.url) and (self.url.endswith(".ht") or os.path.isfile(self.url+".ht")):
