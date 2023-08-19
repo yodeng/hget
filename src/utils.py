@@ -1,5 +1,6 @@
 import os
 import re
+import ssl
 import sys
 import time
 import signal
@@ -255,6 +256,13 @@ def parseArg():
                        help='set PASS as proxy password', metavar="<str>")
     proxy.add_argument('--use-proxy-env', default=False, action='store_true',
                        help='use HTTP_PROXY or HTTPS_PROXY environment variables for proxy url')
+    ssl = parser.add_argument_group("ssl validation  arguments")
+    ssl.add_argument('--cacert', type=str,
+                     help='CA certificate to verify peer against', metavar="<file>")
+    ssl.add_argument('--cert', type=str,
+                     help='Client certificate file', metavar="<file>")
+    ssl.add_argument('--key', type=str,
+                     help='Client certificate private key file (PEM format)', metavar="<file>")
     aws = parser.add_argument_group("aws arguments")
     aws.add_argument('--access-key', dest='access_key', type=str,
                      help='access key if necessary', metavar="<str>")

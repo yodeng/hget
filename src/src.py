@@ -113,8 +113,14 @@ class Download(object):
 
     async def download(self):
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
+        ssl = False
+        ssl_context = self.extra.get("ssl_context")
+        if ssl_context:
+            self.extra.pop("ssl_context")
+            ssl_context.check_hostname = False
+            ssl = None
         self.connector = TCPConnector(
-            limit=self.tcp_conn, ssl=False)
+            limit=self.tcp_conn, ssl_context=ssl_context, ssl=ssl)
         trust_env = False
         if self.extra.get("proxy_env"):
             trust_env = self.extra.pop("proxy_env")
