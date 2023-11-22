@@ -273,11 +273,19 @@ def parseArg():
 
 def restart_with_reloader():
     new_environ = os.environ.copy()
+    cnns = 100
     while True:
         args = [sys.executable] + sys.argv
+        if cnns < 100:
+            args.extend(["-c", str(int(cnns))])
         new_environ["RUN_MAIN"] = 'true'
         exit_code = subprocess.call(args, env=new_environ)
-        if exit_code != 3:
+        if exit_code == 5:  # reduce max connections
+            c = max(1, cnns//1.5)
+            if c == cnns == 1:
+                return exit_code
+            cnns = c
+        elif exit_code != 3:
             return exit_code
         new_environ["RUN_HGET_FIRST"] = "false"
         time.sleep(0.1)
@@ -322,3 +330,12 @@ def add_query_parameters(media_url, query_params):
     new_params = {**params, **query_params}
     query = urlencode(new_params, doseq=True)
     return urlunsplit((scheme, netloc, path, query, frag))
+
+
+def full_class_name(o):
+    '''return full class name of the input instance'''
+    klass = o.__class__
+    module = klass.__module__
+    if module is None or module == 'builtins':
+        return klass.__qualname__  # avoid outputs like 'builtins.str'
+    return module + '.' + klass.__qualname__

@@ -348,8 +348,10 @@ class Download(object):
                 sys.exit(1)
             Done = True
         except ReloadException as e:
-            self.loger.debug(e)
-            if os.environ.get("RUN_MAIN") == "true":
+            self.loger.debug("%s: %s", full_class_name(e), e)
+            if isinstance(e, ClientConnectorError):
+                sys.exit(5)
+            elif os.environ.get("RUN_MAIN") == "true":
                 sys.exit(3)
             raise e
         except asyncio.TimeoutError as e:
