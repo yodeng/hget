@@ -6,6 +6,7 @@ import _thread
 
 from .utils import *
 from .ftp import login
+from ._version import __version__
 
 
 class Download(object):
@@ -309,6 +310,7 @@ class Download(object):
         return content_length
 
     def run(self):
+        # self.latest_check()
         self.startime = int(time.time())
         Done = False
         try:
@@ -433,6 +435,21 @@ class Download(object):
                 "Any data gets in %s sec, Exit 3", timeout)
         self.write_offset()
         os._exit(3)
+
+    def latest_check(self):
+        try:
+            v = pv.parse(__version__)
+            req = json.loads(urlopen(
+                'https://pypi.org/pypi/{}/json'.format(__package__), timeout=5).read().decode())
+            info = req['info']
+            latest_version = info['version']
+            if pv.parse(latest_version) > v:
+                self.loger.warn(
+                    "Latest version '%s==%s' is available, you might need to update from '%s' or '%s'",
+                    __package__, latest_version, info['project_urls']['Homepage'], info["package_url"]
+                )
+        except Exception as e:
+            self.loger.debug(e)
 
 
 def hget(url="", outfile="", threads=Chunk.MAX_AS, quiet=False, tcp_conn=None, timeout=30, **kwargs):

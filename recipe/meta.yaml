@@ -19,6 +19,9 @@ requirements:
         - cython
         - pip
     run:
+        - python
+        - cython
+        - pip
         - requests
         - tqdm
         - aiohttp

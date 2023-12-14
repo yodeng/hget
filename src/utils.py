@@ -2,6 +2,7 @@ import os
 import re
 import ssl
 import sys
+import json
 import time
 import signal
 import base64
@@ -15,11 +16,12 @@ import subprocess
 
 from copy import deepcopy
 from math import floor, log10
-from urllib.parse import urlparse
+from urllib.request import urlopen
 from ftplib import FTP, error_temp, error_perm
+from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, currentThread, RLock, Lock
 from multiprocessing import cpu_count, current_process, get_logger
-from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit, urlparse
 
 from tqdm import tqdm
 from boto3 import client
@@ -29,7 +31,7 @@ from botocore.exceptions import ReadTimeoutError
 from aiohttp import ClientSession, TCPConnector, ClientTimeout, BasicAuth, hdrs
 from aiohttp.client_reqrep import ClientRequest
 from aiohttp.client_exceptions import *
-from concurrent.futures import ThreadPoolExecutor
+from pip._vendor.packaging import version as pv
 
 from ._version import __version__
 
