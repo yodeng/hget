@@ -41,6 +41,8 @@ class Download(object):
         self.rate_limiter = RateLimit(
             max(int(float(self.max_speed)/self.chunk_size), 1))
         self.lock = Lock()
+        self.cookies = self.extra.pop("cookies", None)
+        self.trust_env = self.extra.pop("proxy_env", False)
 
     async def get_range(self, session=None, size=1000*Chunk.OneK):
         if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
@@ -108,7 +110,7 @@ class Download(object):
                 mkfile(self.outfile, self.content_length)
             self.write_offset()
 
-    def __offset_thread(self):
+    def _offset_thread(self):
         _thread.start_new_thread(self.check_offset, (self.datatimeout,))
         _thread.start_new_thread(self._auto_write_offset, ())
 
@@ -121,11 +123,12 @@ class Download(object):
             ssl = None
         self.connector = TCPConnector(
             limit=self.tcp_conn, ssl_context=ssl_context, ssl=ssl)
-        trust_env = self.extra.pop("proxy_env", False)
-        cookies = self.extra.pop("cookies", None)
-        async with ClientSession(connector=self.connector, timeout=self.timeout, trust_env=trust_env, cookies=cookies) as session:
+        async with ClientSession(connector=self.connector,
+                                 timeout=self.timeout,
+                                 trust_env=self.trust_env,
+                                 cookies=self.cookies) as session:
             await self.get_range(session)
-            self.__offset_thread()
+            self._offset_thread()
             self.set_sem(self.threads)
             if os.getenv("RUN_HGET_FIRST") != 'false':
                 self.loger.info("File size: %s (%d bytes)",
@@ -176,7 +179,7 @@ class Download(object):
             await self.get_range(ftp)
         finally:
             ftp.close()
-        self.__offset_thread()
+        self._offset_thread()
         if os.getenv("RUN_HGET_FIRST") != 'false':
             self.loger.info("Logging in as anonymous success")
             self.loger.info("File size: %s (%d bytes)",
@@ -276,7 +279,7 @@ class Download(object):
         u = urlparse(self.url)
         self.bucket, self.key = u.hostname, u.path.lstrip("/")
         await self.get_range(session)
-        self.__offset_thread()
+        self._offset_thread()
         if os.getenv("RUN_HGET_FIRST") != 'false':
             self.loger.info("File size: %s (%d bytes)",
                             human_size(self.content_length), self.content_length)
@@ -326,23 +329,7 @@ class Download(object):
                 self.loop.run_until_complete(self.download_s3())
                 self.loop.close()
             elif os.path.isfile(self.url) and (self.url.endswith(".ht") or os.path.isfile(self.url+".ht")):
-                self.rang_file = self.url.endswith(
-                    ".ht") and self.url or self.url+".ht"
-                try:
-                    self.load_offset()
-                except:
-                    self.loger.error("Only http/https/s3/ftp urls allowed.")
-                    sys.exit(1)
-                done, content_length = 0, 0
-                for e, s in self.offset.items():
-                    l = [e, ] + s
-                    done += l[-1]
-                    content_length = max(content_length, e+1)
-                    sys.stdout.write("\t".join(map(str, l)) + "\n")
-                sys.stdout.write("Start time: %s, %s of %s (%.2f%%) finished\n" % (time.strftime(
-                    "%F %X", time.localtime(self.startime)), human_size(done), human_size(content_length), float(done)/content_length*100))
-                self.offset.clear()
-                sys.exit()
+                self.read_range_file()
             else:
                 self.loger.error("Only http/https/s3/ftp urls allowed.")
                 sys.exit(1)
@@ -449,10 +436,219 @@ class Download(object):
         except Exception as e:
             self.loger.debug(e)
 
+    def read_range_file(self):
+        self.rang_file = self.url.endswith(
+            ".ht") and self.url or self.url+".ht"
+        try:
+            self.load_offset()
+        except:
+            self.loger.error("Only http/https/s3/ftp urls allowed.")
+            sys.exit(1)
+        done, content_length = 0, 0
+        for e, s in self.offset.items():
+            l = [e, ] + s
+            done += l[-1]
+            content_length = max(content_length, e+1)
+            sys.stdout.write("\t".join(map(str, l)) + "\n")
+        sys.stdout.write("Start time: %s, %s of %s (%.2f%%) finished\n" % (time.strftime(
+            "%F %X", time.localtime(self.startime)), human_size(done), human_size(content_length), float(done)/content_length*100))
+        self.offset.clear()
+        sys.exit()
 
-def hget(url="", outfile="", threads=Chunk.MAX_AS, quiet=False, tcp_conn=None, timeout=30, **kwargs):
-    dn = Download(url=url, outfile=outfile,
-                  threads=threads, quiet=quiet, tcp_conn=tcp_conn, timeout=timeout,  **kwargs)
+
+class MultiRequests(Download):
+
+    def __init__(self, *args, **kw):
+        '''
+        url:
+        outfile:
+        threads:
+        headers:
+        quiet:
+        cookies:
+        proxy:
+        proxy_env:
+        proxy_user:
+        proxy_pass:
+        max_speed:
+        args:
+        '''
+        super(MultiRequests, self).__init__(*args, **kw)
+        self.args = args = self.extra.pop("input_args", None)
+        self.ca_cert = args.cacert or True
+        self.cert = (
+            args.cacert, args.key) if args.cacert and args.key else None
+        self.proxies = args.proxy and {
+            "http": args.proxy, "https": args.proxy} or {}
+        self.auth = None
+        if args.proxy_user and args.proxy_pass:
+            self.auth = requests.auth.HTTPProxyAuth(
+                args.proxy_user, args.proxy_pass)
+        self.request_args = {
+            "cookies": self.cookies,
+            "verify": self.ca_cert,
+            "cert": self.cert,
+            "timeout": 30,
+            "proxies": self.proxies,
+            "auth": self.auth,
+            "allow_redirects": True,
+        }
+
+    def get_range(self, size=1000*Chunk.OneK):
+        if os.path.isfile(self.rang_file) and os.path.isfile(self.outfile):
+            self.load_offset()
+            content_length = 0
+            for end, s in self.offset.items():
+                start0, read = s
+                self.tqdm_init += read
+                start = sum(s)
+                rang = {'Range': (start, end)}
+                self.range_list.append(rang)
+                content_length = max(content_length, end + 1)
+            mn_as, mn_pt = get_as_part(content_length)
+            self.threads = self.threads or min(
+                max_async(), Chunk.MAX_AS, mn_as)
+            self.parts = min(self.parts, mn_pt)
+            self.content_length = content_length
+            self.loger.debug("%s of %s has download" %
+                             (self.tqdm_init, self.content_length))
+        else:
+            session = requests.Session()
+            session.trust_env = self.trust_env
+            try:
+                req = requests.head(
+                    self.url,
+                    headers=self.headers,
+                    **self.request_args
+                )
+            except requests.exceptions.SSLError as e:
+                if not self.args.cacert:
+                    self.request_args["verify"] = False
+                    req = requests.head(
+                        self.url,
+                        headers=self.headers,
+                        **self.request_args
+                    )
+                else:
+                    raise e
+            if 400 <= req.status_code < 500:
+                raise DownloadError(
+                    "Client ERROR %s: %s bad request" % (req.status_code, self.url))
+            elif 500 <= req.status_code:
+                raise DownloadError(
+                    "Server ERROR %s: %s bad request" % (req.status_code, self.url))
+            content_length = int(req.headers['content-length'])
+            self.content_length = content_length
+            if self.content_length < 1:
+                self.offset = {}
+                self.loger.error(
+                    "Remote file has no content with filesize 0 bytes.")
+                sys.exit(1)
+            if "accept-ranges" not in req.headers:
+                rang = {'Range': (0, content_length-1)}
+                self.offset[content_length-1] = [0, 0]
+                self.range_list.append(rang)
+                self.threads = self.parts = 1
+            else:
+                mn_as, mn_pt = get_as_part(content_length)
+                self.threads = self.threads or min(
+                    max_async(), Chunk.MAX_AS, mn_as)
+                self.parts = min(self.parts, mn_pt)
+                if self.parts:
+                    size = content_length // self.parts
+                    count = self.parts
+                else:
+                    count = content_length // size
+                for i in range(count):
+                    start = i * size
+                    if i == count - 1:
+                        end = content_length - 1
+                    else:
+                        end = start + size
+                    if i > 0:
+                        start += 1
+                    rang = {'Range': (start, end)}
+                    self.offset[end] = [start, 0]
+                    self.range_list.append(rang)
+            if not os.path.isfile(self.outfile):
+                mkfile(self.outfile, self.content_length)
+            self.write_offset()
+
+    def fetch(self, span=None, pbar=None):
+        h = self.headers.copy()
+        if not span:
+            s, e = 0, self.content_length-1
+        else:
+            s, e = span
+        h["Range"] = 'bytes={0}-{1}'.format(s, e)
+        session = requests.Session()
+        session.trust_env = self.trust_env
+        req = session.get(self.url, headers=h,
+                          stream=True, **self.request_args)
+        self.loger.debug(
+            "Start %s %s", currentThread().name, h["Range"])
+        with open(self.outfile, 'r+b') as f:
+            f.seek(s, os.SEEK_SET)
+            for chunk in req.iter_content(chunk_size=self.chunk_size):
+                if chunk:
+                    self.dump_to_file(e, chunk, f, pbar)
+        self.loger.debug(
+            "Finished %s %s", currentThread().name, h["Range"])
+
+    def download(self):
+        self.get_range()
+        self._offset_thread()
+        if os.getenv("RUN_HGET_FIRST") != 'false':
+            self.loger.info("File size: %s (%d bytes)",
+                            human_size(self.content_length), self.content_length)
+            self.loger.info("Starting download %s --> %s",
+                            self.url, self.outfile)
+        self.threads = min(self.threads, MAX_REQ_CONNECT)
+        self.loger.debug("Ranges: %s, threads: %s", self.parts, self.threads)
+        pos = len(
+            self.current._identity) and self.current._identity[0]-1 or None
+        with tqdm(position=pos, disable=self.quiet, total=int(self.content_length), initial=self.tqdm_init, unit='', ascii=True, unit_scale=True, unit_divisor=1024) as bar:
+            self.rate_limiter.refresh()
+            with ThreadPoolExecutor(self.threads) as exector:
+                for h_range in self.range_list:
+                    s, e = h_range["Range"]
+                    if s > e:
+                        continue
+                    exector.submit(self.fetch, (s, e), bar)
+
+    def run(self):
+        # self.latest_check()
+        self.startime = int(time.time())
+        Done = False
+        try:
+            if self.url.startswith("http"):
+                self.download()
+            elif os.path.isfile(self.url) and (self.url.endswith(".ht") or os.path.isfile(self.url+".ht")):
+                self.read_range_file()
+            else:
+                self.loger.error("Only http/https/s3/ftp urls allowed.")
+                sys.exit(1)
+            Done = True
+        except ReloadException as e:
+            self.loger.debug("%s: %s", full_class_name(e), e)
+            if isinstance(e, requests.exceptions.ConnectionError):
+                sys.exit(5)
+            elif os.environ.get("RUN_MAIN") == "true":
+                sys.exit(3)
+            raise e
+        except requests.Timeout as e:
+            raise TimeoutException("Connect url timeout")
+        except Exception as e:
+            self.loger.debug(e)
+            raise e
+        finally:
+            self.write_offset()
+        return Done
+
+
+def hget(func=Download, url="", outfile="", threads=Chunk.MAX_AS, quiet=False, tcp_conn=None, timeout=30, **kwargs):
+    dn = func(url=url, outfile=outfile,
+              threads=threads, quiet=quiet, tcp_conn=tcp_conn, timeout=timeout,  **kwargs)
     es = exitSync(obj=dn)
     es.start()
     res = dn.run()

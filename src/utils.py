@@ -1,5 +1,6 @@
 import os
 import re
+import pdb
 import ssl
 import sys
 import json
@@ -10,6 +11,7 @@ import logging
 import socket
 import struct
 import asyncio
+import requests
 import argparse
 import functools
 import subprocess
@@ -76,9 +78,11 @@ ReloadException = (
     ReadTimeoutError,
     error_temp,
     error_perm,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.HTTPError,
 )
 
-MAX_S3_CONNECT = MAX_FTP_CONNECT = 100
+MAX_S3_CONNECT = MAX_FTP_CONNECT = MAX_REQ_CONNECT = 100
 
 
 def max_async():
@@ -245,8 +249,10 @@ def parseArg():
                         help='suppress all output except error or download success', default=False)
     parser.add_argument('-v', '--version',
                         action='version', version="v" + __version__)
-    parser.add_argument('--noreload', dest='use_reloader', action='store_false',
+    parser.add_argument('--noreload', action='store_true', default=False,
                         help='not use the auto-reloader')
+    parser.add_argument('--requests', action='store_true', default=False,
+                        help='use MultiRequests for download')
     parser.add_argument("url", type=str,
                         help="download url, http/https/ftp/s3 support", metavar="<url>")
     req = parser.add_argument_group("requests arguments")
