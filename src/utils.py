@@ -249,6 +249,11 @@ def parseArg():
                         help='not use the auto-reloader')
     parser.add_argument("url", type=str,
                         help="download url, http/https/ftp/s3 support", metavar="<url>")
+    req = parser.add_argument_group("requests arguments")
+    req.add_argument("--user-agent", type=str,
+                     metavar="<str>", help="send User-Agent")
+    req.add_argument("--cookies", type=str, metavar="<str>",
+                     help="send cookies from string")
     proxy = parser.add_argument_group("proxy arguments")
     proxy.add_argument('-p', '--proxy', type=str,
                        help='proxy url, statswith http/https', metavar="<str>")

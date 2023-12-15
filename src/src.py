@@ -25,8 +25,8 @@ class Download(object):
         self.parts = Chunk.MAX_PT
         self.tcp_conn = tcp_conn
         self.datatimeout = timeout
-        self.headers = headers
-        self.headers.update(default_headers)
+        self.headers = default_headers
+        self.headers.update(headers)
         self.offset = {}
         self.range_list = []
         self.tqdm_init = 0
@@ -115,17 +115,15 @@ class Download(object):
     async def download(self):
         self.timeout = ClientTimeout(total=60*60*24, sock_read=2400)
         ssl = False
-        ssl_context = self.extra.get("ssl_context")
+        ssl_context = self.extra.pop("ssl_context", None)
         if ssl_context:
-            self.extra.pop("ssl_context")
             ssl_context.check_hostname = False
             ssl = None
         self.connector = TCPConnector(
             limit=self.tcp_conn, ssl_context=ssl_context, ssl=ssl)
-        trust_env = False
-        if self.extra.get("proxy_env"):
-            trust_env = self.extra.pop("proxy_env")
-        async with ClientSession(connector=self.connector, timeout=self.timeout, trust_env=trust_env) as session:
+        trust_env = self.extra.pop("proxy_env", False)
+        cookies = self.extra.pop("cookies", None)
+        async with ClientSession(connector=self.connector, timeout=self.timeout, trust_env=trust_env, cookies=cookies) as session:
             await self.get_range(session)
             self.__offset_thread()
             self.set_sem(self.threads)
